@@ -1,3 +1,12 @@
 [workspace]
 resolver = "2"
-members = ["crates/server", "crates/database"]
+members = ["crates/server", "crates/database", "crates/trtcp"]
+
+[workspace.dependencies]
+tokio = { version = "1.43.0", features = ["full", "default"] }
+serde = { version = "1.0.217" }
+serde_json = { version = "1.0.138" }
+dotenvy = { version = "0.15.7" }
+
+[profile.dev.package.sqlx-macros]
+opt-level = 3
