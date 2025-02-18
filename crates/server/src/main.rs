@@ -65,7 +65,6 @@ async fn handle_client(socket: tokio::net::TcpStream) {
 
 #[cfg(test)]
 mod test {
-    use std::thread::sleep;
     use super::*;
 
     #[tokio::test]
@@ -75,10 +74,8 @@ mod test {
         let _server = tokio::spawn(async move {
             start_server(db, 1237).await;
         });
-
-        sleep(std::time::Duration::from_secs(5));
         
-        let mut client = tokio::net::TcpStream::connect("localhost:1237")
+        let client = tokio::net::TcpStream::connect("localhost:1237")
             .await
             .expect("Could not connect");
 
