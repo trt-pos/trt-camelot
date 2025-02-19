@@ -1,8 +1,13 @@
+use getset::Getters;
 use crate::Head;
 
+#[derive(Getters)]
 pub struct Response<'r> {
+    #[get = "pub"]
     head: Head<'r>,
+    #[get = "pub"]
     status: Status,
+    #[get = "pub"]
     body: &'r str,
 }
 
@@ -48,7 +53,9 @@ impl<'r> TryFrom<Response<'r>> for Vec<u8> {
     }
 }
 
+#[derive(Getters)]
 pub struct Status {
+    #[get = "pub"]
     r#type: StatusType,
 }
 

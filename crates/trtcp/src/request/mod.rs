@@ -1,8 +1,13 @@
+use getset::Getters;
 use crate::Head;
 
+#[derive(Getters)]
 pub struct Request<'r> {
+    #[get = "pub"]
     head: Head<'r>,
+    #[get = "pub"]
     action: Action<'r>,
+    #[get = "pub"]
     body: &'r str,
 }
 
@@ -47,9 +52,13 @@ impl TryFrom<Request<'_>> for Vec<u8> {
     
 }
 
+#[derive(Getters)]
 pub struct Action<'r> {
+    #[get = "pub"]
     r#type: ActionType,
+    #[get = "pub"]
     module: &'r str,
+    #[get = "pub"]
     id: &'r str,
 }
 

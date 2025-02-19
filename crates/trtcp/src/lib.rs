@@ -5,12 +5,22 @@ mod request;
 mod response;
 
 pub use error::Error;
-pub use request::Action;
 pub use request::Request;
-use std::str;
+pub use request::Action;
+pub use request::ActionType;
 
+pub use response::Response;
+pub use response::Status;
+pub use response::StatusType;
+
+use std::str;
+use getset::Getters;
+
+#[derive(Getters)]
 pub struct Version {
+    #[get = "pub"]
     major: u16,
+    #[get = "pub"]
     patch: u16,
 }
 
@@ -41,8 +51,11 @@ impl TryFrom<Version> for Vec<u8> {
     }
 }
 
+#[derive(Getters)]
 pub struct Head<'r> {
+    #[get = "pub"]
     pub version: Version,
+    #[get = "pub"]
     pub caller: &'r str,
 }
 

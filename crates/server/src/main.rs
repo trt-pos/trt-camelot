@@ -1,3 +1,5 @@
+mod handlers;
+
 use std::sync::{LazyLock, OnceLock};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -52,14 +54,25 @@ async fn handle_client(socket: tokio::net::TcpStream) {
     let mut writer = tokio::io::BufWriter::new(writer);
 
     loop {
-        let mut buf = vec![0; 1024];
-        let size = reader.read(&mut buf).await.unwrap();
-        
-        let response = std::str::from_utf8(&buf[..size]).unwrap();
-        let response = response.trim();
+        let mut request = Vec::new();
 
-        writer.write_all(response.as_bytes()).await.unwrap();
-        writer.flush().await.unwrap();
+        loop {
+            let mut buf = vec![0; 1024];
+            let size = reader.read(&mut buf).await.expect("Could not read");
+            request.extend_from_slice(&buf[..size]);
+
+            if size < 1024 {
+                break;
+            }
+        };
+
+        let request: trtcp::Request = request.as_slice().try_into().expect("Invalid request");
+
+        let response = handlers::handle_request(request).await;
+        let response_bytes: Vec<u8> = response.try_into().expect("Invalid response");
+
+        writer.write_all(response_bytes.as_slice()).await.expect("Could not write");
+        writer.flush().await.expect("Could not flush");
     }
 }
 
@@ -69,6 +82,7 @@ mod test {
 
     #[tokio::test]
     async fn test_handle_client() {
+        // TODO: Make a real request using trtcp 
         let db = "sqlite::memory:";
 
         let _server = tokio::spawn(async move {
