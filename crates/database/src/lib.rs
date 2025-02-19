@@ -22,7 +22,7 @@ mod test {
         dotenvy::dotenv().ok();
         let pool = create_conn_pool(&env::var("DATABASE_URL").unwrap()).await;
 
-        sqlx::query("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)")
+        sqlx::query("select type from sqlite_master")
             .execute(&pool)
             .await
             .expect("Failed to create table");

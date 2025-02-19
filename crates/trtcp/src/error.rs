@@ -3,10 +3,14 @@ pub enum Error
 {
     #[error("Invalid request")]
     InvalidRequest,
-    #[error("Invalid head")]
+    #[error("Invalid head section")]
     InvalidHead,
-    #[error("Invalid action")]
+    #[error("Invalid action section")]
     InvalidAction,
-    #[error("Invalid body")]
+    #[error("Invalid body section")]
     InvalidBody,
+    #[error("Invalid response")]
+    InvalidResponse,
+    #[error("Invalid status section")]
+    InvalidStatus,
 }

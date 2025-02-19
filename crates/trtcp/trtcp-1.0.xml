@@ -7,35 +7,7 @@
         </head>
         <unit-separator value="0x1F"/>
         <action>
-            <field name="action" type="i32" >
-                <value name="query" value="1" >
-                    <requires-body value="yes" />
-                    <description>
-                        Query the database using the queries in the body
-                    </description>
-                </value>
-                <value name="listen" value="2" >
-                    <requires-body value="no"/>
-                    <description>
-                        Subscribe a listener to the designed id
-                    </description>
-                </value>
-                <value name="call" value="3" >
-                    <requires-body value="yes"/>
-                    <description>
-                        Invoke all the listeners subscribed to the id. The body content is the data to be sent to the listeners
-                    </description>
-                </value>
-                <!-- Not sure about this -->
-                <value name="transaction" value="4" >
-                    <requires-body value="yes" />
-                    <description>
-                        Execute multiple SQL as a transaction in the database. Any error will be reported and the transaction
-                        will be rolled back
-                    </description>
-                </value>
-            </field>
-
+            <field name="action" type="action-type" />
             <field name="module:id" type="string" optional="true">
                 <description>
                     The module and id of the action
@@ -49,12 +21,57 @@
         </body>
     </requests>
     <responses>
-
+        <head>
+            <field name="version" type="i32" />
+            <field name="patch" type="i32" />
+            <field name="caller" type="string" />
+        </head>
+        <unit-separator value="0x1F"/>
+        <status>
+            <field name="status" type="status-code" />
+        </status>
+        <unit-separator value="0x1F"/>
+        <body>
+            <field name="response-data" type="json-string" />
+        </body>
     </responses>
+    
+    <action-type type="i32">
+        <values>
+            <value name="query" value="1" >
+                <requires-body value="yes" />
+                <description>
+                    Query the database using the queries in the body
+                </description>
+            </value>
+            <value name="listen" value="2" >
+                <requires-body value="no"/>
+                <description>
+                    Subscribe a listener to the designed id
+                </description>
+            </value>
+            <value name="call" value="3" >
+                <requires-body value="yes"/>
+                <description>
+                    Invoke all the listeners subscribed to the id. The body content is the data to be sent to the listeners
+                </description>
+            </value>
+            <!-- Not sure about this -->
+            <value name="transaction" value="4" >
+                <requires-body value="yes" />
+                <description>
+                    Execute multiple SQL as a transaction in the database. Any error will be reported and the transaction
+                    will be rolled back
+                </description>
+            </value>
+        </values>
+    </action-type>
     <status-code type="i8">
-        <code name="OK" value="0" />
-        <code name="ERROR" value="-1" >
-        </code>
+        <values>
+            <value name="OK" value="0" />
+            <value name="ERROR" value="-1" >
+            </value>
+        </values>
     </status-code>
 </protocol>
 
