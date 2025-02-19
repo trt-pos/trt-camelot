@@ -13,4 +13,6 @@ pub enum Error
     InvalidResponse,
     #[error("Invalid status section")]
     InvalidStatus,
+    #[error("Invalid action type")]
+    InvalidActionType,
 }

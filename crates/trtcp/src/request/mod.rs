@@ -1,4 +1,4 @@
-use crate::{Head};
+use crate::Head;
 
 pub struct Request<'r> {
     head: Head<'r>,
@@ -48,7 +48,7 @@ impl TryFrom<Request<'_>> for Vec<u8> {
 }
 
 pub struct Action<'r> {
-    r#type: u8,
+    r#type: ActionType,
     module: &'r str,
     id: &'r str,
 }
@@ -56,12 +56,8 @@ pub struct Action<'r> {
 impl<'r> TryFrom<&'r [u8]> for Action<'r> {
     type Error = crate::Error;
     fn try_from(action: &'r [u8]) -> Result<Self, Self::Error> {
-        let (int_bytes, rest) = action.split_at(size_of::<u8>());
-        let r#type = u8::from_be_bytes(
-            int_bytes
-                .try_into()
-                .map_err(|_| crate::Error::InvalidAction)?,
-        );
+        let (type_bytes, rest) = action.split_at(size_of::<u8>());
+        let r#type = type_bytes.try_into()?;
 
         let namespace = std::str::from_utf8(rest).map_err(|_| crate::Error::InvalidAction)?;
 
@@ -83,7 +79,8 @@ impl TryFrom<Action<'_>> for Vec<u8> {
     fn try_from(action: Action) -> Result<Self, Self::Error> {
         let mut result = vec![];
 
-        result.extend(action.r#type.to_be_bytes());
+        let action_type_bytes: Vec<u8> = action.r#type.try_into()?;
+        result.extend(action_type_bytes);
         result.extend_from_slice(action.module.as_bytes());
         result.push(b':');
         result.extend_from_slice(action.id.as_bytes());
@@ -91,6 +88,41 @@ impl TryFrom<Action<'_>> for Vec<u8> {
         Ok(result)
     }
     
+}
+
+#[derive(PartialEq, Debug)]
+pub enum ActionType {
+    Query, // 1
+    Listen, // 2
+    Call, // 3
+    Transaction // 4
+}
+
+impl TryFrom<&[u8]> for ActionType {
+    type Error = crate::Error;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        match value {
+            [1] => Ok(ActionType::Query),
+            [2] => Ok(ActionType::Listen),
+            [3] => Ok(ActionType::Call),
+            [4] => Ok(ActionType::Transaction),
+            _ => Err(crate::Error::InvalidActionType),
+        }
+    }
+}
+
+impl TryFrom<ActionType> for Vec<u8> {
+    type Error = crate::Error;
+
+    fn try_from(value: ActionType) -> Result<Self, Self::Error> {
+        match value {
+            ActionType::Query => Ok(vec![1]),
+            ActionType::Listen => Ok(vec![2]),
+            ActionType::Call => Ok(vec![3]),
+            ActionType::Transaction => Ok(vec![4]),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -105,7 +137,7 @@ mod test {
                 caller: "345",
             },
             action: Action {
-                r#type: 0,
+                r#type: ActionType::Query,
                 module: "ns",
                 id: "id",
             },
@@ -120,15 +152,15 @@ mod test {
         assert_eq!(head.version.major, 1);
         assert_eq!(head.version.patch, 2);
         assert_eq!(head.caller, "345");
-        
+
         let action = request.action;
-        assert_eq!(action.r#type, 0);
+        assert_eq!(action.r#type, ActionType::Query);
         assert_eq!(action.module, "ns");
         assert_eq!(action.id, "id");
-        
+
         assert_eq!(request.body, "hello");
     }
-    
+
     #[test]
     fn test_bytes_into_request() {
         let request: &[u8] = &[
@@ -136,7 +168,7 @@ mod test {
             0, 2, // patch (2)
             51, 52, 53, // caller ("345")
             0x1F, // separator
-            6, // type
+            3, // type Call
             0x6e, 115, 0x3a, 105, 100, // namespace ("ns:id")
             0x1F, // separator
             104, 101, 108, 108, 111, // body ("hello")
@@ -150,7 +182,7 @@ mod test {
         assert_eq!(head.caller, "345");
         
         let action = request.action;
-        assert_eq!(action.r#type, 6);
+        assert_eq!(action.r#type, ActionType::Call);
         assert_eq!(action.module, "ns");
         assert_eq!(action.id, "id");
         
@@ -165,7 +197,7 @@ mod test {
                 caller: "345",
             },
             action: Action {
-                r#type: 6,
+                r#type: ActionType::Transaction,
                 module: "ns",
                 id: "id",
             },
@@ -181,32 +213,32 @@ mod test {
                 0, 2, // patch (2)
                 51, 52, 53, // caller ("345")
                 0x1F, // separator
-                6, // type
+                4, // type Transaction
                 0x6e, 115, 0x3a, 105, 100, // namespace ("ns:id")
                 0x1F, // separator
                 104, 101, 108, 108, 111, // body ("hello")
             ]
         );
     }
-    
+
     #[test]
     fn test_bytes_into_action() {
         let action: &[u8] = &[
-            6, // type (6)
+            2, // type Listen
             0x6e, 115, 0x3a, 105, 100, // namespace ("ns:id")
         ];
         
         let action: Action = action.try_into().unwrap();
 
-        assert_eq!(action.r#type, 6);
+        assert_eq!(action.r#type, ActionType::Listen);
         assert_eq!(action.module, "ns");
         assert_eq!(action.id, "id");
     }
-    
+
     #[test]
     fn test_action_into_bytes() {
         let action = Action {
-            r#type: 6,
+            r#type: ActionType::Query,
             module: "ns",
             id: "id",
         };
@@ -216,7 +248,7 @@ mod test {
         assert_eq!(
             bytes,
             vec![
-                6, // type (6)
+                1, // type Query
                 0x6e, 115, 0x3a, 105, 100, // namespace ("ns:id")
             ]
         );
