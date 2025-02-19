@@ -25,8 +25,30 @@ impl<'r> TryFrom<&'r [u8]> for Request<'r> {
     }
 }
 
+impl TryFrom<Request<'_>> for Vec<u8> {
+    type Error = crate::Error;
+    fn try_from(request: Request) -> Result<Self, Self::Error> {
+        let mut result = vec![];
+
+        let head_bytes: Vec<u8> = request.head.try_into()?;
+        result.extend(head_bytes);
+        
+        result.push(0x1F);
+        
+        let action_bytes: Vec<u8> = request.action.try_into()?;
+        result.extend(action_bytes);
+        
+        result.push(0x1F);
+        
+        result.extend_from_slice(request.body.as_bytes());
+
+        Ok(result)
+    }
+    
+}
+
 pub struct Action<'r> {
-    r#type: i32,
+    r#type: u8,
     module: &'r str,
     id: &'r str,
 }
@@ -34,8 +56,8 @@ pub struct Action<'r> {
 impl<'r> TryFrom<&'r [u8]> for Action<'r> {
     type Error = crate::Error;
     fn try_from(action: &'r [u8]) -> Result<Self, Self::Error> {
-        let (int_bytes, rest) = action.split_at(size_of::<i32>());
-        let r#type = i32::from_be_bytes(
+        let (int_bytes, rest) = action.split_at(size_of::<u8>());
+        let r#type = u8::from_be_bytes(
             int_bytes
                 .try_into()
                 .map_err(|_| crate::Error::InvalidAction)?,
@@ -56,18 +78,65 @@ impl<'r> TryFrom<&'r [u8]> for Action<'r> {
     }
 }
 
+impl TryFrom<Action<'_>> for Vec<u8> {
+    type Error = crate::Error;
+    fn try_from(action: Action) -> Result<Self, Self::Error> {
+        let mut result = vec![];
+
+        result.extend(action.r#type.to_be_bytes());
+        result.extend_from_slice(action.module.as_bytes());
+        result.push(b':');
+        result.extend_from_slice(action.id.as_bytes());
+
+        Ok(result)
+    }
+    
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
 
     #[test]
-    fn test_request_try_form() {
+    fn test_req_into_req() {
+        let request = Request {
+            head: Head {
+                version: crate::Version { major: 1, patch: 2 },
+                caller: "345",
+            },
+            action: Action {
+                r#type: 0,
+                module: "ns",
+                id: "id",
+            },
+            body: "hello",
+        };
+
+        let bytes: Vec<u8> = request.try_into().unwrap();
+
+        let request = Request::try_from(&bytes[..]).unwrap();
+
+        let head = request.head;
+        assert_eq!(head.version.major, 1);
+        assert_eq!(head.version.patch, 2);
+        assert_eq!(head.caller, "345");
+        
+        let action = request.action;
+        assert_eq!(action.r#type, 0);
+        assert_eq!(action.module, "ns");
+        assert_eq!(action.id, "id");
+        
+        assert_eq!(request.body, "hello");
+    }
+    
+    #[test]
+    fn test_bytes_into_request() {
         let request: &[u8] = &[
-            0, 0, 0, 1, // major (1)
-            0, 0, 0, 2, // patch (2)
+            0, 1, // major (1)
+            0, 2, // patch (2)
             51, 52, 53, // caller ("345")
             0x1F, // separator
-            0, 0, 0, 6, // type
+            6, // type
             0x6e, 115, 0x3a, 105, 100, // namespace ("ns:id")
             0x1F, // separator
             104, 101, 108, 108, 111, // body ("hello")
@@ -89,12 +158,41 @@ mod test {
     }
 
     #[test]
-    fn test_parse_action() {
+    fn test_request_into_bytes() {
+        let request = Request {
+            head: Head {
+                version: crate::Version { major: 1, patch: 2 },
+                caller: "345",
+            },
+            action: Action {
+                r#type: 6,
+                module: "ns",
+                id: "id",
+            },
+            body: "hello",
+        };
 
-        assert_eq!(0x3a, b':');
+        let bytes: Vec<u8> = request.try_into().unwrap();
 
+        assert_eq!(
+            bytes,
+            vec![
+                0, 1, // major (1)
+                0, 2, // patch (2)
+                51, 52, 53, // caller ("345")
+                0x1F, // separator
+                6, // type
+                0x6e, 115, 0x3a, 105, 100, // namespace ("ns:id")
+                0x1F, // separator
+                104, 101, 108, 108, 111, // body ("hello")
+            ]
+        );
+    }
+    
+    #[test]
+    fn test_bytes_into_action() {
         let action: &[u8] = &[
-            0, 0, 0, 6, // type (6)
+            6, // type (6)
             0x6e, 115, 0x3a, 105, 100, // namespace ("ns:id")
         ];
         
@@ -103,5 +201,24 @@ mod test {
         assert_eq!(action.r#type, 6);
         assert_eq!(action.module, "ns");
         assert_eq!(action.id, "id");
+    }
+    
+    #[test]
+    fn test_action_into_bytes() {
+        let action = Action {
+            r#type: 6,
+            module: "ns",
+            id: "id",
+        };
+
+        let bytes: Vec<u8> = action.try_into().unwrap();
+
+        assert_eq!(
+            bytes,
+            vec![
+                6, // type (6)
+                0x6e, 115, 0x3a, 105, 100, // namespace ("ns:id")
+            ]
+        );
     }
 }

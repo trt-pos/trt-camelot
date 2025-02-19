@@ -26,6 +26,28 @@ impl<'r> TryFrom<&'r [u8]> for Response<'r> {
     }
 }
 
+impl<'r> TryFrom<Response<'r>> for Vec<u8> {
+    type Error = crate::Error;
+
+    fn try_from(response: Response<'r>) -> Result<Self, Self::Error> {
+        let mut result = vec![];
+
+        let head_bytes: Vec<u8> = response.head.try_into()?;
+        result.extend(head_bytes);
+
+        result.push(0x1F);
+
+        let status_bytes: Vec<u8> = response.status.try_into()?;
+        result.extend(status_bytes);
+
+        result.push(0x1F);
+
+        result.extend_from_slice(response.body.as_bytes());
+
+        Ok(result)
+    }
+}
+
 pub struct Status {
     r#type: StatusType,
 }
@@ -43,6 +65,19 @@ impl TryFrom<&[u8]> for Status {
         .try_into()?;
 
         Ok(Status { r#type })
+    }
+}
+
+impl TryFrom<Status> for Vec<u8> {
+    type Error = crate::Error;
+
+    fn try_from(status: Status) -> Result<Self, Self::Error> {
+        let mut result = vec![];
+
+        let r#type: i8 = status.r#type.try_into()?;
+        result.push(r#type as u8);
+
+        Ok(result)
     }
 }
 
@@ -64,36 +99,111 @@ impl TryFrom<i8> for StatusType {
     }
 }
 
+impl TryFrom<StatusType> for i8 {
+    type Error = crate::Error;
+
+    fn try_from(status: StatusType) -> Result<Self, crate::Error> {
+        match status {
+            StatusType::OK => Ok(0i8),
+            StatusType::Error => Ok(-1),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::Version;
 
     #[test]
-    fn test_parse_response() {
+    fn test_response_into_response() {
+        let response = Response {
+            head: Head {
+                version: Version { major: 1, patch: 2 },
+                caller: "345",
+            },
+            status: Status {
+                r#type: StatusType::Error,
+            },
+            body: "345",
+        };
+        
+        let bytes: Vec<u8> = response.try_into().unwrap();
+        
+        let response: Response = bytes.as_slice().try_into().unwrap();
+        
+        assert_eq!(response.head.version.major, 1);
+        assert_eq!(response.head.version.patch, 2);
+        assert_eq!(response.head.caller, "345");
+        assert_eq!(response.status.r#type, StatusType::Error);
+        assert_eq!(response.body, "345");
+    }
+
+    #[test]
+    fn test_bytes_into_response() {
         let response: &[u8] = &[
-            0, 0, 0, 1, // major (1)
-            0, 0, 0, 2, // patch (2)
-            51, 52, 53, // caller ("345")
+            0, 1, // major (1)
+            0, 2, // patch (2)
+            51, 52, 53,   // caller ("345")
             0x1F, // separator
-            0, 0, 0, 0, // code (1)
+            0,    // code (0)
             0x1F, // separator
             51, 52, 53, // body ("345")
         ];
 
-        let response = Response::try_from(response).unwrap();
-        
+        let response: Response = response.try_into().unwrap();
+
         assert_eq!(response.head.version.major, 1);
         assert_eq!(response.head.version.patch, 2);
         assert_eq!(response.head.caller, "345");
         assert_eq!(response.status.r#type, StatusType::OK);
         assert_eq!(response.body, "345");
     }
-    
+
     #[test]
-    fn test_parse_status() {
-        let status: &[u8] = &[0, 0, 0, 0];
+    fn test_response_into_bytes() {
+        let response = Response {
+            head: Head {
+                version: Version { major: 1, patch: 2 },
+                caller: "345",
+            },
+            status: Status {
+                r#type: StatusType::OK,
+            },
+            body: "345",
+        };
+
+        let bytes: Vec<u8> = response.try_into().unwrap();
+
+        assert_eq!(
+            bytes,
+            vec![
+                0, 1, // major (1)
+                0, 2, // patch (2)
+                51, 52, 53,   // caller ("345")
+                0x1F, // separator
+                0,    // code (0)
+                0x1F, // separator
+                51, 52, 53, // body ("345")
+            ]
+        );
+    }
+
+    #[test]
+    fn test_bytes_into_status() {
+        let status: &[u8] = &[0, 0];
         let status: Status = status.try_into().unwrap();
-        
+
         assert_eq!(status.r#type, StatusType::OK);
+    }
+
+    #[test]
+    fn test_status_into_bytes() {
+        let status = Status {
+            r#type: StatusType::OK,
+        };
+        let bytes: Vec<u8> = status.try_into().unwrap();
+
+        assert_eq!(bytes, vec![0]);
     }
 }
