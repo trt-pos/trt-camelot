@@ -101,10 +101,14 @@ impl TryFrom<Status> for Vec<u8> {
     }
 }
 
-#[derive(PartialEq, Debug)]
+/// 0 -> OK
+/// < 0 -> Unrecoverable error
+/// > 0 -> Recoverable error
+#[derive(PartialEq, Debug, Clone)]
 pub enum StatusType {
     OK,    // 0
-    Error, // -1
+    GenericError, // -1
+    AlreadyConnected, // 1
 }
 
 impl TryFrom<i8> for StatusType {
@@ -113,7 +117,8 @@ impl TryFrom<i8> for StatusType {
     fn try_from(code: i8) -> Result<Self, crate::Error> {
         match code {
             0 => Ok(StatusType::OK),
-            -1 => Ok(StatusType::Error),
+            -1 => Ok(StatusType::GenericError),
+            1 => Ok(StatusType::AlreadyConnected),
             _ => Err(crate::Error::InvalidStatus),
         }
     }
@@ -125,7 +130,8 @@ impl TryFrom<StatusType> for i8 {
     fn try_from(status: StatusType) -> Result<Self, crate::Error> {
         match status {
             StatusType::OK => Ok(0i8),
-            StatusType::Error => Ok(-1),
+            StatusType::GenericError => Ok(-1),
+            StatusType::AlreadyConnected => Ok(1),
         }
     }
 }
@@ -143,7 +149,7 @@ mod test {
                 caller: "345",
             },
             status: Status {
-                r#type: StatusType::Error,
+                r#type: StatusType::GenericError,
             },
             body: "345",
         };
@@ -155,7 +161,7 @@ mod test {
         assert_eq!(response.head.version.major, 1);
         assert_eq!(response.head.version.patch, 2);
         assert_eq!(response.head.caller, "345");
-        assert_eq!(response.status.r#type, StatusType::Error);
+        assert_eq!(response.status.r#type, StatusType::GenericError);
         assert_eq!(response.body, "345");
     }
 
