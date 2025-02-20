@@ -8,7 +8,6 @@ pub use error::Error;
 // TODO: Hacer un ping para mantener la conexión y cerrarla si no hablo en los ultimos 5 mins
 
 use std::collections::HashMap;
-use std::ops::DerefMut;
 use std::sync::{Arc, LazyLock, OnceLock};
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter, ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
@@ -16,20 +15,50 @@ use tokio::sync::{Mutex, RwLock};
 use trtcp::{ActionType, Head, Request, Response};
 
 static DB_POOL: LazyLock<OnceLock<sqlx::SqlitePool>> = LazyLock::new(OnceLock::new);
-static CLIENTS: LazyLock<Arc<RwLock<HashMap<String, ClientData>>>> =
+static CLIENTS: LazyLock<Arc<RwLock<HashMap<String, Client>>>> =
     LazyLock::new(|| Arc::new(RwLock::new(HashMap::new())));
 
-struct ClientData {
+struct Client {
+    name: String,
     reader: Arc<Mutex<ReadHalf<TcpStream>>>,
     writer: Arc<Mutex<WriteHalf<TcpStream>>>,
 }
 
-impl ClientData {
-    pub fn new(reader: ReadHalf<TcpStream>, writer: WriteHalf<TcpStream>) -> Self {
+impl Client {
+    fn new(reader: ReadHalf<TcpStream>, writer: WriteHalf<TcpStream>) -> Self {
         Self {
+            name: String::new(),
             reader: Arc::new(Mutex::new(reader)),
             writer: Arc::new(Mutex::new(writer)),
         }
+    }
+
+    async fn read<'r>(&self, buf: &'r mut Vec<u8>) -> Result<Request<'r>, Error> {
+        buf.clear();
+
+        let mut reader = self.reader.lock().await;
+
+        read_stream(&mut reader, buf).await?;
+
+        let request = Request::try_from(buf.as_slice())?;
+        Ok(request)
+    }
+
+    async fn write(&self, response: Response<'_>) -> Result<(), Error> {
+        let mut writer = self.writer.lock().await;
+
+        let response_bytes: Vec<u8> = response.try_into()?;
+
+        write_stream(&mut writer, response_bytes.as_slice()).await?;
+
+        Ok(())
+    }
+
+    async fn shutdown(&self) -> Result<(), Error> {
+        let mut writer = self.writer.lock().await;
+        writer.shutdown().await?;
+
+        Ok(())
     }
 }
 
@@ -73,122 +102,111 @@ async fn start_server(db: &str, port: u16) {
 }
 
 async fn handle_client(socket: TcpStream) {
-    // TODO: Improve the error handling
-    let (mut reader, mut writer) = tokio::io::split(socket);
+    let client_name = match handle_first_connection(socket).await {
+        Ok(client) => {
+            let client = match client {
+                Some(client) => client,
+                None => return,
+            };
 
-    let client_name = match handle_first_connection(&mut reader).await {
-        Ok((response, valid, client_name)) => {
-            let response_bytes: Vec<u8> = response.try_into().expect("Invalid response");
-            write_stream(&mut writer, response_bytes.as_slice())
-                .await
-                .expect("Could not write");
-            if valid {
-                CLIENTS
-                    .write()
-                    .await
-                    .insert(client_name.clone(), ClientData::new(reader, writer));
-            } else {
-                writer.shutdown().await.expect("Could not shutdown client");
-                return;
-            }
+            let client_name = client.name.clone();
+
+            CLIENTS.write().await.insert(client.name.clone(), client);
 
             client_name
         }
         Err(e) => {
             eprintln!("Error: {}", e);
-            writer.shutdown().await.expect("Could not shutdown");
             return;
         }
     };
 
+    let mut buffer = vec![];
+
     loop {
-        // TODO: Make a get_request and send_response function inside the ClientData struct
-        // Reading the client stream
-        let mutex_guard = CLIENTS.read().await;
-        let clients_hash_map = mutex_guard.get(&client_name).expect("Client not found");
+        let request = {
+            let guard = CLIENTS.read().await;
+            let client = guard.get(&client_name).expect("Client not found");
 
-        let mut reader = clients_hash_map.reader.lock().await;
-        let request_bytes = read_stream(reader.deref_mut())
-            .await
-            .expect("Could not read");
-
-        drop(reader);
-        drop(mutex_guard);
+            if let Ok(request) = client.read(&mut buffer).await {
+                request
+            } else {
+                client.shutdown().await.expect("Could not shutdown client");
+                drop(guard);
+                CLIENTS.write().await.remove(&client_name);
+                break;
+            }
+        };
 
         // Creating a response
-        let request = Request::try_from(request_bytes.as_slice()).expect("Invalid request");
         let response = handlers::handle_request(request).await;
-        let response_bytes: Vec<u8> = response.try_into().expect("Invalid response");
 
-        // Writing the response to the client stream
-        let mutex_guard = CLIENTS.read().await;
-        let clients_hash_map = mutex_guard.get(&client_name).expect("Client not found");
-        
-        let mut writer = clients_hash_map.writer.lock().await;
-        write_stream(writer.deref_mut(), response_bytes.as_slice())
-            .await
-            .expect("Could not write");
-        
-        drop(writer);
-        drop(mutex_guard);
+        {
+            let guard = CLIENTS.read().await;
+            let client = guard.get(&client_name).expect("Client not found");
+
+            if client.write(response).await.is_err() {
+                client.shutdown().await.expect("Could not shutdown client");
+                drop(guard);
+                CLIENTS.write().await.remove(&client_name);
+                break;
+            }
+        }
     }
 }
 
-async fn handle_first_connection<'a>(
-    reader: &mut ReadHalf<TcpStream>,
-) -> Result<(Response<'a>, bool, String), Error> {
-    let request_bytes = read_stream(reader).await?;
-    let request = Request::try_from(request_bytes.as_slice())?;
-    let caller = request.head().caller.to_string();
+async fn handle_first_connection(socket: TcpStream) -> Result<Option<Client>, Error> {
+    let (reader, writer) = tokio::io::split(socket);
+    let mut client = Client::new(reader, writer);
 
-    let ret = if *request.action().r#type() != ActionType::Connect {
-        (
-            Response::new(
-                head("server"),
-                trtcp::Status::new(trtcp::StatusType::NeedConnection),
-                "",
-            ),
-            false,
-            caller,
-        )
+    let mut buff = Vec::new();
+
+    let request = client.read(&mut buff).await?;
+
+    let client_name = request.head().caller.to_string();
+
+    if *request.action().r#type() != ActionType::Connect {
+        let response = Response::new(
+            head("server"),
+            trtcp::Status::new(trtcp::StatusType::NeedConnection),
+            "",
+        );
+
+        client.write(response).await?;
+        client.shutdown().await?;
+        Ok(None)
     } else {
-        (
-            Response::new(
-                head("server"),
-                trtcp::Status::new(trtcp::StatusType::OK),
-                "",
-            ),
-            true,
-            caller,
-        )
-    };
+        let response = Response::new(
+            head("server"),
+            trtcp::Status::new(trtcp::StatusType::OK),
+            "",
+        );
 
-    Ok(ret)
+        client.name = client_name;
+        client.write(response).await?;
+        Ok(Some(client))
+    }
 }
 
-async fn read_stream(reader: &mut ReadHalf<TcpStream>) -> Result<Vec<u8>, Error> {
+async fn read_stream(reader: &mut ReadHalf<TcpStream>, bytes: &mut Vec<u8>) -> Result<(), Error> {
     let mut reader = BufReader::new(reader);
-    let mut req_bytes = Vec::new();
     loop {
         let mut buf = [0; 1024];
         let size = reader
             .read(&mut buf)
             .await
             .map_err(|_| Error::ReadingError)?;
-        req_bytes.extend_from_slice(&buf[..size]);
+        bytes.extend_from_slice(&buf[..size]);
 
         if size < 1024 {
             break;
         }
     }
 
-    Ok(req_bytes)
+    Ok(())
 }
 
-async fn write_stream(
-    writer: &mut WriteHalf<TcpStream>,
-    bytes: &[u8],
-) -> Result<(), Error> {
+async fn write_stream(writer: &mut WriteHalf<TcpStream>, bytes: &[u8]) -> Result<(), Error> {
     let mut writer = BufWriter::new(writer);
     writer.write_all(bytes).await?;
 
@@ -205,7 +223,7 @@ mod test {
     use super::*;
 
     #[tokio::test]
-    async fn test_handle_client() {
+    async fn test_handle_clients() {
         let db = "sqlite::memory:";
 
         let server = tokio::spawn(async move {
@@ -218,7 +236,7 @@ mod test {
                 .expect("Could not connect");
 
             let client_name = format!("test{}", i);
-            
+
             let (mut reader, mut writer) = tokio::io::split(client);
 
             let request = Request::new(
@@ -239,11 +257,7 @@ mod test {
 
             assert_eq!(*response.status().r#type(), trtcp::StatusType::OK);
             assert!(CLIENTS.read().await.contains_key(&client_name));
-            
-            writer.shutdown().await.expect("Error shutting down client");
         }
-        
-        assert_eq!(CLIENTS.read().await.len(), 10);
 
         server.abort();
     }

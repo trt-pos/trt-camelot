@@ -17,7 +17,7 @@
         </action>
         <unit-separator value="0x1F"/>
         <body>
-            <field name="action-data" type="json-string" />
+            <field name="action-data" type="?" />
         </body>
     </requests>
     <responses>
@@ -32,7 +32,7 @@
         </status>
         <unit-separator value="0x1F"/>
         <body>
-            <field name="response-data" type="json-string" />
+            <field name="response-data" type="?" />
         </body>
     </responses>
     
