@@ -112,6 +112,8 @@ pub enum ActionType {
     Listen,      // 2
     Call,        // 3
     Transaction, // 4
+    Leave,       // 5
+    Create,    // 6
 }
 
 impl TryFrom<&[u8]> for ActionType {
@@ -124,6 +126,8 @@ impl TryFrom<&[u8]> for ActionType {
             [2] => Ok(ActionType::Listen),
             [3] => Ok(ActionType::Call),
             [4] => Ok(ActionType::Transaction),
+            [5] => Ok(ActionType::Leave),
+            [6] => Ok(ActionType::Create),
             _ => Err(crate::Error::InvalidActionType),
         }
     }
@@ -139,6 +143,8 @@ impl TryFrom<ActionType> for Vec<u8> {
             ActionType::Listen => Ok(vec![2]),
             ActionType::Call => Ok(vec![3]),
             ActionType::Transaction => Ok(vec![4]),
+            ActionType::Leave => Ok(vec![5]),
+            ActionType::Create => Ok(vec![6]),
         }
     }
 }

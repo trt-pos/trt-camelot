@@ -3,7 +3,12 @@
         <head>
             <field name="version" type="u16" />
             <field name="patch" type="u16" />
-            <field name="caller" type="string" />
+            <field name="caller" type="string">
+                <description>
+                    Name of the client.
+                    Matches regex [a-zA-Z0-9_]+
+                </description>
+            </field>
         </head>
         <unit-separator value="0x1F"/>
         <action>
@@ -24,7 +29,12 @@
         <head>
             <field name="version" type="u16" />
             <field name="patch" type="u16" />
-            <field name="caller" type="string" />
+            <field name="caller" type="string" >
+                <description>
+                    The caller is the same name as in the request
+                    Matches regex [a-zA-Z0-9_]+
+                </description>
+            </field>
         </head>
         <unit-separator value="0x1F"/>
         <status>
@@ -35,7 +45,25 @@
             <field name="response-data" type="?" />
         </body>
     </responses>
-    
+    <calls>
+        <head>
+            <field name="version" type="u16" />
+            <field name="patch" type="u16" />
+            <field name="caller" type="string" >
+                <description>
+                    The caller is the name of the event that is being listened when receiving a call
+                </description>
+            </field>
+        </head>
+        <unit-separator value="0x1F"/>
+        <status>
+            <field name="status" type="status-code" />
+        </status>
+        <unit-separator value="0x1F"/>
+        <body>
+            <field name="response-data" type="?" />
+        </body>
+    </calls>
     <action-type type="u8">
         <values>
             <value name="connect" value="0" >
