@@ -51,14 +51,10 @@
             <field name="patch" type="u16" />
             <field name="caller" type="string" >
                 <description>
-                    The caller is the name of the event that is being listened when receiving a call
+                    The caller is the name of the event that is being listened to when receiving a call
                 </description>
             </field>
         </head>
-        <unit-separator value="0x1F"/>
-        <status>
-            <field name="status" type="status-code" />
-        </status>
         <unit-separator value="0x1F"/>
         <body>
             <field name="response-data" type="?" />
