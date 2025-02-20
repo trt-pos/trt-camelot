@@ -28,6 +28,10 @@ impl Version {
     pub fn new(major: u16, patch: u16) -> Self {
         Version { major, patch }
     }
+    
+    pub fn actual() -> Self {
+        Version { major: 1, patch: 0 }
+    }
 }
 
 impl TryFrom<&[u8]> for Version {

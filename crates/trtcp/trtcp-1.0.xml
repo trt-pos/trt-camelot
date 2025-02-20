@@ -38,6 +38,13 @@
     
     <action-type type="u8">
         <values>
+            <value name="connect" value="0" >
+                <requires-body value="no" />
+                <description>
+                    Establish the first connection server-client
+                    and saves the client using the caller field provided in the head
+                </description>
+            </value>
             <value name="query" value="1" >
                 <requires-body value="yes" />
                 <description>

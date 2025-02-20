@@ -107,6 +107,7 @@ impl TryFrom<Action<'_>> for Vec<u8> {
 
 #[derive(PartialEq, Debug)]
 pub enum ActionType {
+    Connect,    // 0
     Query,       // 1
     Listen,      // 2
     Call,        // 3
@@ -118,6 +119,7 @@ impl TryFrom<&[u8]> for ActionType {
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         match value {
+            [0] => Ok(ActionType::Connect),
             [1] => Ok(ActionType::Query),
             [2] => Ok(ActionType::Listen),
             [3] => Ok(ActionType::Call),
@@ -132,6 +134,7 @@ impl TryFrom<ActionType> for Vec<u8> {
 
     fn try_from(value: ActionType) -> Result<Self, Self::Error> {
         match value {
+            ActionType::Connect => Ok(vec![0]),
             ActionType::Query => Ok(vec![1]),
             ActionType::Listen => Ok(vec![2]),
             ActionType::Call => Ok(vec![3]),
