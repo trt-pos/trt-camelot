@@ -76,8 +76,10 @@
     <status-code type="i8">
         <values>
             <value name="OK" value="0" />
-            <value name="ERROR" value="-1" >
-            </value>
+            <value name="GenericError" value="-1" />
+            <value name="NeedConnection" value="-2" />
+            <value name="AlreadyConnected" value="1" />
+            <value name="InvalidRequest" value="2" />
         </values>
     </status-code>
 </protocol>

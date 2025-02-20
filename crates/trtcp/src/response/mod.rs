@@ -108,7 +108,9 @@ impl TryFrom<Status> for Vec<u8> {
 pub enum StatusType {
     OK,    // 0
     GenericError, // -1
+    NeedConnection, // -2
     AlreadyConnected, // 1
+    InvalidRequest, // 2
 }
 
 impl TryFrom<i8> for StatusType {
@@ -118,7 +120,9 @@ impl TryFrom<i8> for StatusType {
         match code {
             0 => Ok(StatusType::OK),
             -1 => Ok(StatusType::GenericError),
+            -2 => Ok(StatusType::NeedConnection),
             1 => Ok(StatusType::AlreadyConnected),
+            2 => Ok(StatusType::InvalidRequest),
             _ => Err(crate::Error::InvalidStatus),
         }
     }
@@ -131,7 +135,9 @@ impl TryFrom<StatusType> for i8 {
         match status {
             StatusType::OK => Ok(0i8),
             StatusType::GenericError => Ok(-1),
+            StatusType::NeedConnection => Ok(-2),
             StatusType::AlreadyConnected => Ok(1),
+            StatusType::InvalidRequest => Ok(2),
         }
     }
 }
