@@ -6,7 +6,7 @@ use crate::handlers::ReqHandler;
 pub(super) struct CallHandler;
 
 impl ReqHandler for CallHandler {
-    fn handle<'a>(&self, request: Request<'a>) -> Pin<Box<dyn Future<Output = Response<'a>> + Send>> {
+    fn handle<'a>(&self, _request: Request<'a>) -> Pin<Box<dyn Future<Output = Response<'a>> + Send + 'a>> {
         todo!()
     }
 }
