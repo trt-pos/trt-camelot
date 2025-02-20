@@ -167,7 +167,7 @@ async fn handle_first_connection(socket: TcpStream) -> Result<Option<Client>, Er
 
     if *request.action().r#type() != ActionType::Connect {
         let response = Response::new(
-            head("server"),
+            head(&client_name),
             trtcp::Status::new(trtcp::StatusType::NeedConnection),
             "",
         );
@@ -177,12 +177,12 @@ async fn handle_first_connection(socket: TcpStream) -> Result<Option<Client>, Er
         Ok(None)
     } else {
         let response = Response::new(
-            head("server"),
+            head(&client_name),
             trtcp::Status::new(trtcp::StatusType::OK),
             "",
         );
 
-        client.name = client_name;
+        client.name = client_name.clone();
         client.write(response).await?;
         Ok(Some(client))
     }
@@ -255,6 +255,7 @@ mod test {
 
             let response = Response::try_from(&buf[..size]).unwrap();
 
+            assert_eq!(response.head().caller, client_name);
             assert_eq!(*response.status().r#type(), trtcp::StatusType::OK);
             assert!(CLIENTS.read().await.contains_key(&client_name));
         }
