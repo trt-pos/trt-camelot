@@ -1,5 +1,5 @@
-use getset::Getters;
 use crate::Head;
+use getset::Getters;
 
 #[derive(Getters)]
 pub struct Response<'r> {
@@ -9,6 +9,13 @@ pub struct Response<'r> {
     status: Status,
     #[get = "pub"]
     body: &'r str,
+}
+
+impl Response<'_> {
+    pub fn new<'a>(head: Head<'a>, status: Status, body: &'a str) -> Response<'a> {
+        Response { head, status, body }
+    }
+    
 }
 
 impl<'r> TryFrom<&'r [u8]> for Response<'r> {
@@ -57,6 +64,12 @@ impl<'r> TryFrom<Response<'r>> for Vec<u8> {
 pub struct Status {
     #[get = "pub"]
     r#type: StatusType,
+}
+
+impl Status {
+    pub fn new(r#type: StatusType) -> Self {
+        Status { r#type }
+    }
 }
 
 impl TryFrom<&[u8]> for Status {
@@ -134,11 +147,11 @@ mod test {
             },
             body: "345",
         };
-        
+
         let bytes: Vec<u8> = response.try_into().unwrap();
-        
+
         let response: Response = bytes.as_slice().try_into().unwrap();
-        
+
         assert_eq!(response.head.version.major, 1);
         assert_eq!(response.head.version.patch, 2);
         assert_eq!(response.head.caller, "345");

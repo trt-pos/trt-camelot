@@ -1,5 +1,5 @@
-use getset::Getters;
 use crate::Head;
+use getset::Getters;
 
 #[derive(Getters)]
 pub struct Request<'r> {
@@ -9,6 +9,12 @@ pub struct Request<'r> {
     action: Action<'r>,
     #[get = "pub"]
     body: &'r str,
+}
+
+impl Request<'_> {
+    pub fn new<'r>(head: Head<'r>, action: Action<'r>, body: &'r str) -> Request<'r> {
+        Request { head, action, body }
+    }
 }
 
 impl<'r> TryFrom<&'r [u8]> for Request<'r> {
@@ -22,7 +28,7 @@ impl<'r> TryFrom<&'r [u8]> for Request<'r> {
 
         let head = split_request[0].try_into()?;
         let action = split_request[1].try_into()?;
-        
+
         let body = split_request[2];
         let body = std::str::from_utf8(body).map_err(|_| crate::Error::InvalidBody)?;
 
@@ -37,19 +43,18 @@ impl TryFrom<Request<'_>> for Vec<u8> {
 
         let head_bytes: Vec<u8> = request.head.try_into()?;
         result.extend(head_bytes);
-        
+
         result.push(0x1F);
-        
+
         let action_bytes: Vec<u8> = request.action.try_into()?;
         result.extend(action_bytes);
-        
+
         result.push(0x1F);
-        
+
         result.extend_from_slice(request.body.as_bytes());
 
         Ok(result)
     }
-    
 }
 
 #[derive(Getters)]
@@ -60,6 +65,12 @@ pub struct Action<'r> {
     module: &'r str,
     #[get = "pub"]
     id: &'r str,
+}
+
+impl Action<'_> {
+    pub fn new<'r>(r#type: ActionType, module: &'r str, id: &'r str) -> Action<'r> {
+        Action { r#type, module, id }
+    }
 }
 
 impl<'r> TryFrom<&'r [u8]> for Action<'r> {
@@ -75,11 +86,7 @@ impl<'r> TryFrom<&'r [u8]> for Action<'r> {
         let module = &namespace[..action_id_separator];
         let id = &namespace[action_id_separator + 1..];
 
-        Ok(Action {
-            r#type,
-            module,
-            id,
-        })
+        Ok(Action { r#type, module, id })
     }
 }
 
@@ -96,15 +103,14 @@ impl TryFrom<Action<'_>> for Vec<u8> {
 
         Ok(result)
     }
-    
 }
 
 #[derive(PartialEq, Debug)]
 pub enum ActionType {
-    Query, // 1
-    Listen, // 2
-    Call, // 3
-    Transaction // 4
+    Query,       // 1
+    Listen,      // 2
+    Call,        // 3
+    Transaction, // 4
 }
 
 impl TryFrom<&[u8]> for ActionType {
@@ -175,26 +181,26 @@ mod test {
         let request: &[u8] = &[
             0, 1, // major (1)
             0, 2, // patch (2)
-            51, 52, 53, // caller ("345")
+            51, 52, 53,   // caller ("345")
             0x1F, // separator
-            3, // type Call
-            0x6e, 115, 0x3a, 105, 100, // namespace ("ns:id")
+            3,    // type Call
+            0x6e, 115, 0x3a, 105, 100,  // namespace ("ns:id")
             0x1F, // separator
             104, 101, 108, 108, 111, // body ("hello")
         ];
-        
+
         let request = Request::try_from(request).unwrap();
 
         let head = request.head;
         assert_eq!(head.version.major, 1);
         assert_eq!(head.version.patch, 2);
         assert_eq!(head.caller, "345");
-        
+
         let action = request.action;
         assert_eq!(action.r#type, ActionType::Call);
         assert_eq!(action.module, "ns");
         assert_eq!(action.id, "id");
-        
+
         assert_eq!(request.body, "hello");
     }
 
@@ -220,10 +226,10 @@ mod test {
             vec![
                 0, 1, // major (1)
                 0, 2, // patch (2)
-                51, 52, 53, // caller ("345")
+                51, 52, 53,   // caller ("345")
                 0x1F, // separator
-                4, // type Transaction
-                0x6e, 115, 0x3a, 105, 100, // namespace ("ns:id")
+                4,    // type Transaction
+                0x6e, 115, 0x3a, 105, 100,  // namespace ("ns:id")
                 0x1F, // separator
                 104, 101, 108, 108, 111, // body ("hello")
             ]
@@ -236,7 +242,7 @@ mod test {
             2, // type Listen
             0x6e, 115, 0x3a, 105, 100, // namespace ("ns:id")
         ];
-        
+
         let action: Action = action.try_into().unwrap();
 
         assert_eq!(action.r#type, ActionType::Listen);

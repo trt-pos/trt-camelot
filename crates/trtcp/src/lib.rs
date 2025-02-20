@@ -24,6 +24,12 @@ pub struct Version {
     patch: u16,
 }
 
+impl Version {
+    pub fn new(major: u16, patch: u16) -> Self {
+        Version { major, patch }
+    }
+}
+
 impl TryFrom<&[u8]> for Version {
     type Error = Error;
 
@@ -57,6 +63,12 @@ pub struct Head<'r> {
     pub version: Version,
     #[get = "pub"]
     pub caller: &'r str,
+}
+
+impl Head<'_> {
+    pub fn new(version: Version, caller: &str) -> Head {
+        Head { version, caller }
+    }
 }
 
 impl<'a> TryFrom<&'a [u8]> for Head<'a> {
