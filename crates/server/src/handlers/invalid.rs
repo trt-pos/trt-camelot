@@ -16,14 +16,14 @@ impl InvalidHandler {
 }
 
 impl ReqHandler for InvalidHandler {
-    fn handle<'a>(&self, _: Request<'a>) -> Pin<Box<dyn Future<Output = Response<'a>> + Send + 'a>> {
+    fn handle<'a>(&self, request: Request<'a>) -> Pin<Box<dyn Future<Output = Response<'a>> + Send + 'a>> {
         let status_type = self.status_type.clone();
         
         Box::pin(async move {
             Response::new(
                 trtcp::Head::new(
                     trtcp::Version::actual(),
-                    "server",
+                    request.head().caller,
                 ),
                 trtcp::Status::new(
                     status_type,

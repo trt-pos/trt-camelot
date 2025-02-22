@@ -1,12 +1,14 @@
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::{Arc, LazyLock, OnceLock};
+use std::sync::{Arc, LazyLock};
 use tokio::sync::RwLock;
 use trtcp::{Response, Status, StatusType};
 
 mod call;
+mod create;
 mod invalid;
+mod leave;
 mod listen;
 mod query;
 mod transaction;
@@ -18,7 +20,7 @@ trait ReqHandler: Send {
     fn handle<'a>(
         &self,
         request: trtcp::Request<'a>,
-    ) -> Pin<Box<dyn Future<Output = trtcp::Response<'a>> + Send + 'a>>;
+    ) -> Pin<Box<dyn Future<Output = Response<'a>> + Send + 'a>>;
 }
 
 impl From<&trtcp::ActionType> for Box<dyn ReqHandler> {
@@ -31,11 +33,13 @@ impl From<&trtcp::ActionType> for Box<dyn ReqHandler> {
             trtcp::ActionType::Listen => Box::from(listen::ListenHandler),
             trtcp::ActionType::Call => Box::from(call::CallHandler),
             trtcp::ActionType::Transaction => Box::from(transaction::TransactionHandler),
+            trtcp::ActionType::Leave => Box::from(leave::LeaveHandler),
+            trtcp::ActionType::Create => Box::from(create::CreateHandler),
         }
     }
 }
 
-pub async fn handle_request(request: trtcp::Request<'_>) -> trtcp::Response {
+pub async fn handle_request(request: trtcp::Request<'_>) -> Response {
     let version = &request.head().version;
     if *version.major() != 1 || *version.patch() != 0 {
         panic!(
