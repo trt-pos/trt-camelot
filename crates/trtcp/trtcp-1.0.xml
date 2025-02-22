@@ -22,7 +22,7 @@
         </action>
         <unit-separator value="0x1F"/>
         <body>
-            <field name="action-data" type="?" />
+            <field name="action-data" type="[u8]" />
         </body>
     </requests>
     <responses>
@@ -42,7 +42,7 @@
         </status>
         <unit-separator value="0x1F"/>
         <body>
-            <field name="response-data" type="?" />
+            <field name="response-data" type="[u8]" />
         </body>
     </responses>
     <calls>
@@ -57,7 +57,7 @@
         </head>
         <unit-separator value="0x1F"/>
         <body>
-            <field name="response-data" type="?" />
+            <field name="response-data" type="[u8]" />
         </body>
     </calls>
     <action-type type="u8">

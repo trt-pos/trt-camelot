@@ -3,6 +3,7 @@
 mod error;
 mod request;
 mod response;
+mod call;
 
 pub use error::Error;
 pub use request::Request;
@@ -13,8 +14,12 @@ pub use response::Response;
 pub use response::Status;
 pub use response::StatusType;
 
+pub use call::Call;
+
 use std::str;
 use getset::Getters;
+
+// TODO: Make, request, response and call own the data they contain
 
 #[derive(Getters)]
 pub struct Version {
