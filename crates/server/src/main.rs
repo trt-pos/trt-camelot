@@ -44,15 +44,18 @@ impl Client {
     }
 
     async fn write(&self, response: Response<'_>) -> Result<(), Error> {
-        let mut writer = self.writer.lock().await;
+        let response_bytes: Vec<u8> = response.into();
 
-        let response_bytes: Vec<u8> = response.try_into()?;
-
-        write_stream(&mut writer, response_bytes.as_slice()).await?;
-
-        Ok(())
+        self.write_slice(response_bytes.as_slice()).await
     }
 
+    async fn write_slice(&self, slice: &[u8]) -> Result<(), Error> {
+        let mut writer = self.writer.lock().await;
+
+        write_stream(&mut writer, slice).await?;
+        Ok(())
+    }
+    
     async fn shutdown(&self) -> Result<(), Error> {
         let mut writer = self.writer.lock().await;
         writer.shutdown().await?;
@@ -63,6 +66,7 @@ impl Client {
 
 #[tokio::main]
 async fn main() {
+    tracing_subscriber::fmt::init();
     let args: Vec<String> = std::env::args().collect();
 
     let port = if args.len() == 2 {
@@ -122,14 +126,13 @@ async fn handle_client(socket: TcpStream) {
                 request
             } else {
                 client.shutdown().await.expect("Could not shutdown client");
-                drop(guard);
                 CLIENTS.write().await.remove(&client_name);
                 break;
             }
         };
 
         // Creating a response
-        let response = handlers::handle_request(request).await;
+        let response = handlers::handle_request(&request).await;
 
         {
             let guard = CLIENTS.read().await;
@@ -137,7 +140,6 @@ async fn handle_client(socket: TcpStream) {
 
             if client.write(response).await.is_err() {
                 client.shutdown().await.expect("Could not shutdown client");
-                drop(guard);
                 CLIENTS.write().await.remove(&client_name);
                 break;
             }
@@ -153,11 +155,11 @@ async fn handle_first_connection(socket: TcpStream) -> Result<Option<Client>, Er
 
     let request = client.read(&mut buff).await?;
 
-    let client_name = request.head().caller.to_string();
+    let client_name = request.head().caller().to_string();
 
     if *request.action().r#type() != ActionType::Connect {
         let response = Response::new(
-            head(&client_name),
+            new_head(&client_name),
             trtcp::Status::new(trtcp::StatusType::NeedConnection),
             "".as_ref(),
         );
@@ -167,7 +169,7 @@ async fn handle_first_connection(socket: TcpStream) -> Result<Option<Client>, Er
         Ok(None)
     } else {
         let response = Response::new(
-            head(&client_name),
+            new_head(&client_name),
             trtcp::Status::new(trtcp::StatusType::OK),
             "".as_ref(),
         );
@@ -204,7 +206,7 @@ async fn write_stream(writer: &mut WriteHalf<TcpStream>, bytes: &[u8]) -> Result
     Ok(())
 }
 
-fn head(caller: &str) -> Head {
+fn new_head(caller: &str) -> Head {
     Head::new(trtcp::Version::actual(), caller)
 }
 
@@ -243,7 +245,7 @@ mod test {
 
             let response = Response::try_from(&buf[..size]).unwrap();
 
-            assert_eq!(response.head().caller, client_name);
+            assert_eq!(response.head().caller(), client_name);
             assert_eq!(*response.status().r#type(), trtcp::StatusType::OK);
             assert!(CLIENTS.read().await.contains_key(&client_name));
         }

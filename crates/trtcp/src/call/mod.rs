@@ -35,18 +35,17 @@ impl<'c> TryFrom<&'c [u8]> for Call<'c> {
     }
 }
 
-impl TryFrom<Call<'_>> for Vec<u8> {
-    type Error = crate::Error;
-    fn try_from(call: Call) -> Result<Self, Self::Error> {
+impl From<Call<'_>> for Vec<u8> {
+    fn from(call: Call) -> Self {
         let mut result = vec![];
 
-        let head_bytes: Vec<u8> = call.head.try_into()?;
+        let head_bytes: Vec<u8> = call.head.into();
         result.extend(head_bytes);
 
         result.push(0x1F);
 
         result.extend_from_slice(call.body);
 
-        Ok(result)
+        result
     }
 }

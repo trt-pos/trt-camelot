@@ -43,25 +43,23 @@ impl<'r> TryFrom<&'r [u8]> for Response<'r> {
     }
 }
 
-impl<'r> TryFrom<Response<'r>> for Vec<u8> {
-    type Error = crate::Error;
-
-    fn try_from(response: Response<'r>) -> Result<Self, Self::Error> {
+impl<'r> From<Response<'r>> for Vec<u8> {
+    fn from(response: Response<'r>) -> Self {
         let mut result = vec![];
 
-        let head_bytes: Vec<u8> = response.head.try_into()?;
+        let head_bytes: Vec<u8> = response.head.into();
         result.extend(head_bytes);
 
         result.push(0x1F);
 
-        let status_bytes: Vec<u8> = response.status.try_into()?;
+        let status_bytes: Vec<u8> = response.status.into();
         result.extend(status_bytes);
 
         result.push(0x1F);
 
         result.extend_from_slice(response.body);
-
-        Ok(result)
+        
+        result
     }
 }
 
@@ -93,16 +91,14 @@ impl TryFrom<&[u8]> for Status {
     }
 }
 
-impl TryFrom<Status> for Vec<u8> {
-    type Error = crate::Error;
-
-    fn try_from(status: Status) -> Result<Self, Self::Error> {
+impl From<Status> for Vec<u8> {
+    fn from(status: Status) -> Self {
         let mut result = vec![];
 
-        let r#type: i8 = status.r#type.try_into()?;
+        let r#type: i8 = status.r#type.into();
         result.push(r#type as u8);
 
-        Ok(result)
+        result
     }
 }
 
@@ -111,11 +107,17 @@ impl TryFrom<Status> for Vec<u8> {
 /// > 0 -> Recoverable error
 #[derive(PartialEq, Debug, Clone)]
 pub enum StatusType {
-    OK,               // 0
-    GenericError,     // -1
-    NeedConnection,   // -2
-    AlreadyConnected, // 1
-    InvalidRequest,   // 2
+    OK, // 0
+    // Errors
+    GenericError,        // -1
+    NeedConnection,      // -2
+    InternalServerError, // -3
+    // Warnings
+    AlreadyConnected,   // 1
+    InvalidRequest,     // 2
+    EventNotFound,      // 3
+    ListenerNotFound,   // 4
+    EventAlreadyExists, // 5
 }
 
 impl TryFrom<i8> for StatusType {
@@ -126,23 +128,29 @@ impl TryFrom<i8> for StatusType {
             0 => Ok(StatusType::OK),
             -1 => Ok(StatusType::GenericError),
             -2 => Ok(StatusType::NeedConnection),
+            -3 => Ok(StatusType::InternalServerError),
             1 => Ok(StatusType::AlreadyConnected),
             2 => Ok(StatusType::InvalidRequest),
+            3 => Ok(StatusType::EventNotFound),
+            4 => Ok(StatusType::ListenerNotFound),
+            5 => Ok(StatusType::EventAlreadyExists),
             _ => Err(crate::Error::InvalidStatus),
         }
     }
 }
 
-impl TryFrom<StatusType> for i8 {
-    type Error = crate::Error;
-
-    fn try_from(status: StatusType) -> Result<Self, crate::Error> {
+impl From<StatusType> for i8 {
+    fn from(status: StatusType) -> Self {
         match status {
-            StatusType::OK => Ok(0i8),
-            StatusType::GenericError => Ok(-1),
-            StatusType::NeedConnection => Ok(-2),
-            StatusType::AlreadyConnected => Ok(1),
-            StatusType::InvalidRequest => Ok(2),
+            StatusType::OK => 0i8,
+            StatusType::GenericError => -1,
+            StatusType::NeedConnection => -2,
+            StatusType::InternalServerError => -3,
+            StatusType::AlreadyConnected => 1,
+            StatusType::InvalidRequest => 2,
+            StatusType::EventNotFound => 3,
+            StatusType::ListenerNotFound => 4,
+            StatusType::EventAlreadyExists => 5,
         }
     }
 }

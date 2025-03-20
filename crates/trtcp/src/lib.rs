@@ -19,8 +19,6 @@ pub use call::Call;
 use std::str;
 use getset::Getters;
 
-// TODO: Make, request, response and call own the data they contain
-
 #[derive(Getters)]
 pub struct Version {
     #[get = "pub"]
@@ -53,30 +51,31 @@ impl TryFrom<&[u8]> for Version {
     }
 }
 
-impl TryFrom<Version> for Vec<u8> {
-    type Error = Error;
-
-    fn try_from(value: Version) -> Result<Self, Self::Error> {
+impl From<Version> for Vec<u8> {
+    fn from(value: Version) -> Self {
         let mut version = Vec::new();
 
         version.extend_from_slice(&value.major.to_be_bytes());
         version.extend_from_slice(&value.patch.to_be_bytes());
 
-        Ok(version)
+        version
     }
 }
 
 #[derive(Getters)]
 pub struct Head<'r> {
     #[get = "pub"]
-    pub version: Version,
-    #[get = "pub"]
-    pub caller: &'r str,
+    version: Version,
+    caller: &'r str,
 }
 
 impl Head<'_> {
     pub fn new(version: Version, caller: &str) -> Head {
         Head { version, caller }
+    }
+    
+    pub fn caller(&self) -> &str {
+        self.caller
     }
 }
 
@@ -93,19 +92,18 @@ impl<'a> TryFrom<&'a [u8]> for Head<'a> {
     }
 }
 
-impl TryFrom<Head<'_>> for Vec<u8> {
-    type Error = Error;
+impl From<Head<'_>> for Vec<u8> {
 
-    fn try_from(head: Head<'_>) -> Result<Self, Self::Error> {
+    fn from(head: Head<'_>) -> Self {
         let mut result = Vec::new();
 
-        let version_bytes: Vec<u8> = head.version.try_into()?;
+        let version_bytes: Vec<u8> = head.version.into();
         result.extend(version_bytes);
 
         let caller_bytes = head.caller.as_bytes();
         result.extend_from_slice(caller_bytes);
 
-        Ok(result)
+        result
     }
 }
 

@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-serde = { workspace = true }
-serde_json = { workspace = true }
+tracing = { version = "0.1.41" }
+tracing-subscriber = { version = "0.3.19" }
 tokio = { workspace = true }
 trtcp = { path = "../trtcp" }
 thiserror = { workspace = true }

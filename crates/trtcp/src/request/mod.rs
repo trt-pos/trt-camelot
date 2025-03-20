@@ -44,12 +44,12 @@ impl TryFrom<Request<'_>> for Vec<u8> {
     fn try_from(request: Request) -> Result<Self, Self::Error> {
         let mut result = vec![];
 
-        let head_bytes: Vec<u8> = request.head.try_into()?;
+        let head_bytes: Vec<u8> = request.head.into();
         result.extend(head_bytes);
 
         result.push(0x1F);
 
-        let action_bytes: Vec<u8> = request.action.try_into()?;
+        let action_bytes: Vec<u8> = request.action.into();
         result.extend(action_bytes);
 
         result.push(0x1F);
@@ -93,18 +93,17 @@ impl<'r> TryFrom<&'r [u8]> for Action<'r> {
     }
 }
 
-impl TryFrom<Action<'_>> for Vec<u8> {
-    type Error = crate::Error;
-    fn try_from(action: Action) -> Result<Self, Self::Error> {
+impl From<Action<'_>> for Vec<u8> {
+    fn from(action: Action) -> Self {
         let mut result = vec![];
 
-        let action_type_bytes: Vec<u8> = action.r#type.try_into()?;
+        let action_type_bytes: Vec<u8> = action.r#type.into();
         result.extend(action_type_bytes);
         result.extend_from_slice(action.module.as_bytes());
         result.push(b':');
         result.extend_from_slice(action.id.as_bytes());
 
-        Ok(result)
+        result
     }
 }
 
@@ -132,16 +131,14 @@ impl TryFrom<&[u8]> for ActionType {
     }
 }
 
-impl TryFrom<ActionType> for Vec<u8> {
-    type Error = crate::Error;
-
-    fn try_from(value: ActionType) -> Result<Self, Self::Error> {
+impl From<ActionType> for Vec<u8> {
+    fn from(value: ActionType) -> Self {
         match value {
-            ActionType::Connect => Ok(vec![0]),
-            ActionType::Listen => Ok(vec![1]),
-            ActionType::Call => Ok(vec![2]),
-            ActionType::Create => Ok(vec![3]),
-            ActionType::Leave => Ok(vec![4]),
+            ActionType::Connect => vec![0],
+            ActionType::Listen => vec![1],
+            ActionType::Call => vec![2],
+            ActionType::Create => vec![3],
+            ActionType::Leave => vec![4],
         }
     }
 }

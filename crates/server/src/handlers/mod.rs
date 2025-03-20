@@ -11,13 +11,13 @@ mod invalid;
 mod leave;
 mod listen;
 
-static LISTENERS: LazyLock<Arc<RwLock<HashMap<String, Vec<String>>>>> =
+static EVENTS: LazyLock<Arc<RwLock<HashMap<String, Vec<String>>>>> =
     LazyLock::new(|| Arc::new(RwLock::new(HashMap::new())));
 
 trait ReqHandler: Send {
     fn handle<'a>(
         &self,
-        request: trtcp::Request<'a>,
+        request: &'a trtcp::Request<'_>,
     ) -> Pin<Box<dyn Future<Output = Response<'a>> + Send + 'a>>;
 }
 
@@ -35,8 +35,8 @@ impl From<&trtcp::ActionType> for Box<dyn ReqHandler> {
     }
 }
 
-pub async fn handle_request(request: trtcp::Request<'_>) -> Response {
-    let version = &request.head().version;
+pub async fn handle_request<'a>(request: &'a trtcp::Request<'_>) -> Response<'a> {
+    let version = &request.head().version();
     if *version.major() != 1 || *version.patch() != 0 {
         panic!(
             "Unsupported version: {}.{}",
@@ -46,9 +46,17 @@ pub async fn handle_request(request: trtcp::Request<'_>) -> Response {
     }
 
     let handler: Box<dyn ReqHandler> = request.action().r#type().into();
-    handler.handle(request).await
+    handler.handle(&request).await
 }
 
-fn basic_response(caller: &str) -> Response {
-    Response::new(crate::head(caller), Status::new(StatusType::OK), "".as_bytes())
+fn ok_response(caller: &str) -> Response {
+    Response::new(crate::new_head(caller), Status::new(StatusType::OK), "".as_bytes())
+}
+
+fn unexpected_error_response<'a>(caller: &'a str, error_msg: &'a str) -> Response<'a> {
+    Response::new(
+        crate::new_head(caller),
+        Status::new(StatusType::InternalServerError),
+        error_msg.as_bytes(),
+    )
 }
