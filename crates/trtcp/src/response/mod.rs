@@ -8,14 +8,21 @@ pub struct Response<'r> {
     #[get = "pub"]
     status: Status,
     #[get = "pub"]
-    body: &'r str,
+    body: &'r [u8],
 }
 
 impl Response<'_> {
-    pub fn new<'a>(head: Head<'a>, status: Status, body: &'a str) -> Response<'a> {
-        Response { head, status, body }
+    pub fn new<'a, T: Into<&'a [u8]>>(head: Head<'a>, status: Status, body: T) -> Response<'a> {
+        Response {
+            head,
+            status,
+            body: body.into(),
+        }
     }
-    
+
+    pub fn body_as_str(&self) -> Result<&str, std::str::Utf8Error> {
+        std::str::from_utf8(self.body)
+    }
 }
 
 impl<'r> TryFrom<&'r [u8]> for Response<'r> {
@@ -31,8 +38,6 @@ impl<'r> TryFrom<&'r [u8]> for Response<'r> {
         let head = split_response[0].try_into()?;
         let status = split_response[1].try_into()?;
         let body = split_response[2];
-
-        let body = std::str::from_utf8(body).map_err(|_| crate::Error::InvalidBody)?;
 
         Ok(Response { head, status, body })
     }
@@ -54,7 +59,7 @@ impl<'r> TryFrom<Response<'r>> for Vec<u8> {
 
         result.push(0x1F);
 
-        result.extend_from_slice(response.body.as_bytes());
+        result.extend_from_slice(response.body);
 
         Ok(result)
     }
@@ -106,11 +111,11 @@ impl TryFrom<Status> for Vec<u8> {
 /// > 0 -> Recoverable error
 #[derive(PartialEq, Debug, Clone)]
 pub enum StatusType {
-    OK,    // 0
-    GenericError, // -1
-    NeedConnection, // -2
+    OK,               // 0
+    GenericError,     // -1
+    NeedConnection,   // -2
     AlreadyConnected, // 1
-    InvalidRequest, // 2
+    InvalidRequest,   // 2
 }
 
 impl TryFrom<i8> for StatusType {
@@ -157,7 +162,7 @@ mod test {
             status: Status {
                 r#type: StatusType::GenericError,
             },
-            body: "345",
+            body: "345".as_bytes(),
         };
 
         let bytes: Vec<u8> = response.try_into().unwrap();
@@ -168,7 +173,7 @@ mod test {
         assert_eq!(response.head.version.patch, 2);
         assert_eq!(response.head.caller, "345");
         assert_eq!(response.status.r#type, StatusType::GenericError);
-        assert_eq!(response.body, "345");
+        assert_eq!(response.body, "345".as_bytes());
     }
 
     #[test]
@@ -189,7 +194,7 @@ mod test {
         assert_eq!(response.head.version.patch, 2);
         assert_eq!(response.head.caller, "345");
         assert_eq!(response.status.r#type, StatusType::OK);
-        assert_eq!(response.body, "345");
+        assert_eq!(response.body, "345".as_bytes());
     }
 
     #[test]
@@ -202,7 +207,7 @@ mod test {
             status: Status {
                 r#type: StatusType::OK,
             },
-            body: "345",
+            body: "345".as_bytes(),
         };
 
         let bytes: Vec<u8> = response.try_into().unwrap();

@@ -28,7 +28,7 @@ impl ReqHandler for InvalidHandler {
                 trtcp::Status::new(
                     status_type,
                 ),
-                "",
+                "".as_bytes(),
             )
         })
     }

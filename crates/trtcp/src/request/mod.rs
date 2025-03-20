@@ -8,12 +8,16 @@ pub struct Request<'r> {
     #[get = "pub"]
     action: Action<'r>,
     #[get = "pub"]
-    body: &'r str,
+    body: &'r [u8],
 }
 
 impl Request<'_> {
-    pub fn new<'r>(head: Head<'r>, action: Action<'r>, body: &'r str) -> Request<'r> {
-        Request { head, action, body }
+    pub fn new<'r, T: Into<&'r [u8]>>(head: Head<'r>, action: Action<'r>, body: T) -> Request<'r> {
+        Request { head, action, body: body.into() }
+    }
+    
+    pub fn body_as_str(&self) -> Result<&str, std::str::Utf8Error> {
+        std::str::from_utf8(self.body)
     }
 }
 
@@ -30,7 +34,6 @@ impl<'r> TryFrom<&'r [u8]> for Request<'r> {
         let action = split_request[1].try_into()?;
 
         let body = split_request[2];
-        let body = std::str::from_utf8(body).map_err(|_| crate::Error::InvalidBody)?;
 
         Ok(Request { head, action, body })
     }
@@ -51,7 +54,7 @@ impl TryFrom<Request<'_>> for Vec<u8> {
 
         result.push(0x1F);
 
-        result.extend_from_slice(request.body.as_bytes());
+        result.extend_from_slice(request.body);
 
         Ok(result)
     }
@@ -107,13 +110,11 @@ impl TryFrom<Action<'_>> for Vec<u8> {
 
 #[derive(PartialEq, Debug)]
 pub enum ActionType {
-    Connect,    // 0
-    Query,       // 1
-    Listen,      // 2
-    Call,        // 3
-    Transaction, // 4
-    Leave,       // 5
-    Create,    // 6
+    Connect,
+    Listen,
+    Call,
+    Leave,
+    Create,
 }
 
 impl TryFrom<&[u8]> for ActionType {
@@ -122,12 +123,10 @@ impl TryFrom<&[u8]> for ActionType {
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         match value {
             [0] => Ok(ActionType::Connect),
-            [1] => Ok(ActionType::Query),
-            [2] => Ok(ActionType::Listen),
-            [3] => Ok(ActionType::Call),
-            [4] => Ok(ActionType::Transaction),
-            [5] => Ok(ActionType::Leave),
-            [6] => Ok(ActionType::Create),
+            [1] => Ok(ActionType::Listen),
+            [2] => Ok(ActionType::Call),
+            [3] => Ok(ActionType::Create),
+            [4] => Ok(ActionType::Leave),
             _ => Err(crate::Error::InvalidActionType),
         }
     }
@@ -139,12 +138,10 @@ impl TryFrom<ActionType> for Vec<u8> {
     fn try_from(value: ActionType) -> Result<Self, Self::Error> {
         match value {
             ActionType::Connect => Ok(vec![0]),
-            ActionType::Query => Ok(vec![1]),
-            ActionType::Listen => Ok(vec![2]),
-            ActionType::Call => Ok(vec![3]),
-            ActionType::Transaction => Ok(vec![4]),
-            ActionType::Leave => Ok(vec![5]),
-            ActionType::Create => Ok(vec![6]),
+            ActionType::Listen => Ok(vec![1]),
+            ActionType::Call => Ok(vec![2]),
+            ActionType::Create => Ok(vec![3]),
+            ActionType::Leave => Ok(vec![4]),
         }
     }
 }
@@ -161,11 +158,11 @@ mod test {
                 caller: "345",
             },
             action: Action {
-                r#type: ActionType::Query,
+                r#type: ActionType::Listen,
                 module: "ns",
                 id: "id",
             },
-            body: "hello",
+            body: "hello".as_bytes(),
         };
 
         let bytes: Vec<u8> = request.try_into().unwrap();
@@ -178,11 +175,11 @@ mod test {
         assert_eq!(head.caller, "345");
 
         let action = request.action;
-        assert_eq!(action.r#type, ActionType::Query);
+        assert_eq!(action.r#type, ActionType::Listen);
         assert_eq!(action.module, "ns");
         assert_eq!(action.id, "id");
 
-        assert_eq!(request.body, "hello");
+        assert_eq!(request.body, "hello".as_bytes());
     }
 
     #[test]
@@ -192,7 +189,7 @@ mod test {
             0, 2, // patch (2)
             51, 52, 53,   // caller ("345")
             0x1F, // separator
-            3,    // type Call
+            2,    // type Call
             0x6e, 115, 0x3a, 105, 100,  // namespace ("ns:id")
             0x1F, // separator
             104, 101, 108, 108, 111, // body ("hello")
@@ -210,7 +207,7 @@ mod test {
         assert_eq!(action.module, "ns");
         assert_eq!(action.id, "id");
 
-        assert_eq!(request.body, "hello");
+        assert_eq!(request.body, "hello".as_bytes());
     }
 
     #[test]
@@ -221,11 +218,11 @@ mod test {
                 caller: "345",
             },
             action: Action {
-                r#type: ActionType::Transaction,
+                r#type: ActionType::Leave,
                 module: "ns",
                 id: "id",
             },
-            body: "hello",
+            body: "hello".as_bytes(),
         };
 
         let bytes: Vec<u8> = request.try_into().unwrap();
@@ -248,13 +245,13 @@ mod test {
     #[test]
     fn test_bytes_into_action() {
         let action: &[u8] = &[
-            2, // type Listen
+            2, // type Call
             0x6e, 115, 0x3a, 105, 100, // namespace ("ns:id")
         ];
 
         let action: Action = action.try_into().unwrap();
 
-        assert_eq!(action.r#type, ActionType::Listen);
+        assert_eq!(action.r#type, ActionType::Call);
         assert_eq!(action.module, "ns");
         assert_eq!(action.id, "id");
     }
@@ -262,7 +259,7 @@ mod test {
     #[test]
     fn test_action_into_bytes() {
         let action = Action {
-            r#type: ActionType::Query,
+            r#type: ActionType::Connect,
             module: "ns",
             id: "id",
         };
@@ -272,7 +269,7 @@ mod test {
         assert_eq!(
             bytes,
             vec![
-                1, // type Query
+                0, // type Query
                 0x6e, 115, 0x3a, 105, 100, // namespace ("ns:id")
             ]
         );

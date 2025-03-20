@@ -23,7 +23,7 @@ impl ReqHandler for ListenHandler {
                 return Response::new(
                     head(caller_name),
                     trtcp::Status::new(trtcp::StatusType::InvalidRequest),
-                    "",
+                    "".as_bytes(),
                 );
             };
 
@@ -44,7 +44,7 @@ mod test {
         let request = Request::new(
             Head::new(Version::new(1, 0), "caller"),
             Action::new(ActionType::Listen, "module", "id"),
-            "",
+            "".as_bytes(),
         );
 
         let response = ListenHandler.handle(request).await;

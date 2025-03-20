@@ -7,8 +7,5 @@ edition = "2021"
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
-database = { path = "../database" }
 trtcp = { path = "../trtcp" }
 thiserror = { workspace = true }
-# TODO: Remove this dependency if possible and rely int the database crate
-sqlx = { version = "0.8.3" }

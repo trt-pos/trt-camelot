@@ -32,7 +32,7 @@
             <field name="caller" type="string" >
                 <description>
                     The caller is the same name as in the request
-                    Matches regex [a-zA-Z0-9_]+
+                    Matches regex [a-zA-Z0-9_\-]+
                 </description>
             </field>
         </head>
@@ -57,7 +57,7 @@
         </head>
         <unit-separator value="0x1F"/>
         <body>
-            <field name="response-data" type="[u8]" />
+            <field name="call-data" type="[u8]" />
         </body>
     </calls>
     <action-type type="u8">
@@ -69,30 +69,29 @@
                     and saves the client using the caller field provided in the head
                 </description>
             </value>
-            <value name="query" value="1" >
-                <requires-body value="yes" />
-                <description>
-                    Query the database using the queries in the body
-                </description>
-            </value>
-            <value name="listen" value="2" >
+            <value name="listen" value="1" >
                 <requires-body value="no"/>
                 <description>
                     Subscribe a listener to the designed id
                 </description>
             </value>
-            <value name="call" value="3" >
+            <value name="call" value="2" >
                 <requires-body value="yes"/>
                 <description>
-                    Invoke all the listeners subscribed to the id. The body content is the data to be sent to the listeners
+                    Invoke all the listeners subscribed to the id. The body content is the data to be sent to the listeners,
+                    and its obtained from the request
                 </description>
             </value>
-            <!-- Not sure about this -->
-            <value name="transaction" value="4" >
-                <requires-body value="yes" />
+            <value name="create" value="3" >
+                <requires-body value="yes"/>
                 <description>
-                    Execute multiple SQL as a transaction in the database. Any error will be reported and the transaction
-                    will be rolled back
+                    Create a new listener with the provided id
+                </description>
+            </value>
+            <value name="leave" value="4" >
+                <requires-body value="no"/>
+                <description>
+                    Unsubscribe the listener from the id
                 </description>
             </value>
         </values>

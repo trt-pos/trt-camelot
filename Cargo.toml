@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/server", "crates/database", "crates/trtcp"]
+members = ["crates/server", "crates/trtcp"]
 
 [workspace.dependencies]
 tokio = { version = "1.43.0", features = ["full", "default"] }
@@ -9,6 +9,3 @@ serde_json = { version = "1.0.138" }
 dotenvy = { version = "0.15.7" }
 thiserror = { version = "2.0.11" }
 getset = { version = "0.1.4" }
-
-[profile.dev.package.sqlx-macros]
-opt-level = 3

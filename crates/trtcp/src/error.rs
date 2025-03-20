@@ -15,4 +15,6 @@ pub enum Error
     InvalidStatus,
     #[error("Invalid action type")]
     InvalidActionType,
+    #[error("Invalid call")]
+    InvalidCall,
 }

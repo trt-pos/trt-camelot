@@ -8,13 +8,12 @@ pub use error::Error;
 // TODO: Hacer un ping para mantener la conexión y cerrarla si no hablo en los ultimos 5 mins
 
 use std::collections::HashMap;
-use std::sync::{Arc, LazyLock, OnceLock};
+use std::sync::{Arc, LazyLock};
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter, ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
 use tokio::sync::{Mutex, RwLock};
 use trtcp::{ActionType, Head, Request, Response};
 
-static DB_POOL: LazyLock<OnceLock<sqlx::SqlitePool>> = LazyLock::new(OnceLock::new);
 static CLIENTS: LazyLock<Arc<RwLock<HashMap<String, Client>>>> =
     LazyLock::new(|| Arc::new(RwLock::new(HashMap::new())));
 
@@ -66,28 +65,19 @@ impl Client {
 async fn main() {
     let args: Vec<String> = std::env::args().collect();
 
-    if args.len() != 2 {
-        eprintln!("Usage: {} <database-url> [port]", args[0]);
-        std::process::exit(1);
-    }
-
-    let db = &args[1];
-
-    let port = if args.len() == 3 {
+    let port = if args.len() == 2 {
         args[2].parse().expect("Invalid port")
     } else {
         1237
     };
 
-    start_server(db, port).await;
+    start_server(port).await;
 }
 
-async fn start_server(db: &str, port: u16) {
+async fn start_server(port: u16) {
     let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", port))
         .await
         .expect("Could not bind");
-
-    DB_POOL.set(database::create_conn_pool(db).await).unwrap();
 
     loop {
         match listener.accept().await {
@@ -169,7 +159,7 @@ async fn handle_first_connection(socket: TcpStream) -> Result<Option<Client>, Er
         let response = Response::new(
             head(&client_name),
             trtcp::Status::new(trtcp::StatusType::NeedConnection),
-            "",
+            "".as_ref(),
         );
 
         client.write(response).await?;
@@ -179,7 +169,7 @@ async fn handle_first_connection(socket: TcpStream) -> Result<Option<Client>, Er
         let response = Response::new(
             head(&client_name),
             trtcp::Status::new(trtcp::StatusType::OK),
-            "",
+            "".as_ref(),
         );
 
         client.name = client_name.clone();
@@ -224,10 +214,8 @@ mod test {
 
     #[tokio::test]
     async fn test_handle_clients() {
-        let db = "sqlite::memory:";
-
         let server = tokio::spawn(async move {
-            start_server(db, 1237).await;
+            start_server(1237).await;
         });
 
         for i in 0..10 {
@@ -242,7 +230,7 @@ mod test {
             let request = Request::new(
                 Head::new(trtcp::Version::actual(), &client_name),
                 trtcp::Action::new(ActionType::Connect, "", ""),
-                "",
+                "".as_bytes(),
             );
 
             let request_bytes: Vec<u8> = request.try_into().unwrap();
