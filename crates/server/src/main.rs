@@ -24,11 +24,11 @@ struct Client {
 }
 
 impl Client {
-    async fn read<'r, R: TryFrom<&'r [u8], Error = trtcp::Error>>(&self, buf: &'r mut Vec<u8>) -> Result<R, Error> {
-        self.read_blocking(buf, true).await
+    async fn read_and_wait<'r, R: TryFrom<&'r [u8], Error = trtcp::Error>>(&self, buf: &'r mut Vec<u8>) -> Result<R, Error> {
+        self.read(buf, true).await
     }
 
-    async fn read_blocking<'r, R: TryFrom<&'r [u8], Error = trtcp::Error>>(&self, buf: &'r mut Vec<u8>, blocking: bool) -> Result<R, Error> {
+    async fn read<'r, R: TryFrom<&'r [u8], Error = trtcp::Error>>(&self, buf: &'r mut Vec<u8>, blocking: bool) -> Result<R, Error> {
         buf.clear();
 
         {
@@ -153,7 +153,6 @@ async fn handle_client(socket: TcpStream) {
             let client_name = client.name.clone();
 
             {
-                // TODO: Second client can't get the lock
                 let mut clients = CLIENTS.write().await;
                 clients.insert(client.name.clone(), client);
             }
@@ -172,7 +171,7 @@ async fn handle_client(socket: TcpStream) {
         let request: Result<Request, Error> = {
             let guard = CLIENTS.read().await;
             let client = guard.get(&client_name).expect("Client not found");
-            client.read_blocking(&mut buffer, false).await
+            client.read(&mut buffer, false).await
         };
         
         let request = match request {
@@ -213,7 +212,7 @@ async fn handle_first_connection(socket: TcpStream) -> Result<Option<Client>, Er
     let mut client = Client::from(socket);
 
     let mut buff = Vec::new();
-    let request: Request = client.read(&mut buff).await?;
+    let request: Request = client.read_and_wait(&mut buff).await?;
 
     let client_name = request.head().caller();
 
@@ -280,7 +279,7 @@ mod test {
             client.write(request).await.expect("Could not write");
 
             let mut buf = vec![0u8; 1024];
-            let response: Response = client.read(&mut buf).await.expect("Could not read");
+            let response: Response = client.read_and_wait(&mut buf).await.expect("Could not read");
             
             assert_eq!(response.head().caller(), client_name);
             assert_eq!(*response.status().r#type(), StatusType::OK);
