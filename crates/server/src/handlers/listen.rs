@@ -1,5 +1,5 @@
 use crate::handlers::{ReqHandler, EVENTS};
-use crate::new_head;
+use server::new_head;
 use std::future::Future;
 use std::pin::Pin;
 use trtcp::{Request, Response};
@@ -15,20 +15,44 @@ impl ReqHandler for ListenHandler {
             let caller_name = request.head().caller();
             let event_name = format!("{}:{}", request.action().module(), request.action().id());
 
-            let mut guard = EVENTS.write().await;
+            let already_subscribed = {
+                let guard = EVENTS.read().await;
 
-            let listeners = if let Some(l) = guard.get_mut(&event_name) {
-                l
-            } else {
+                let listeners = if let Some(l) = guard.get(&event_name) {
+                    l
+                } else {
+                    return Response::new(
+                        new_head(caller_name),
+                        trtcp::Status::new(trtcp::StatusType::EventNotFound),
+                        "".as_bytes(),
+                    );
+                };
+                
+                listeners.iter().any(|l| l == caller_name)
+            };
+            
+            if already_subscribed {
                 return Response::new(
                     new_head(caller_name),
-                    trtcp::Status::new(trtcp::StatusType::EventNotFound),
+                    trtcp::Status::new(trtcp::StatusType::AlreadySubscribed),
                     "".as_bytes(),
                 );
-            };
+            }
 
-            listeners.push(caller_name.to_string());
-            crate::ok_response(caller_name)
+            {
+                let mut guard = EVENTS.write().await;
+                let listeners = if let Some(l) = guard.get_mut(&event_name) {
+                    l
+                } else {
+                    return Response::new(
+                        new_head(caller_name),
+                        trtcp::Status::new(trtcp::StatusType::EventNotFound),
+                        "".as_bytes(),
+                    );
+                };
+                listeners.push(caller_name.to_string());
+                server::ok_response(caller_name)
+            }
         })
     }
 }

@@ -1,7 +1,7 @@
 use crate::Head;
 use getset::Getters;
 
-#[derive(Getters)]
+#[derive(Getters, Debug)]
 pub struct Request<'r> {
     #[get = "pub"]
     head: Head<'r>,
@@ -59,7 +59,7 @@ impl From<Request<'_>> for Vec<u8> {
     }
 }
 
-#[derive(Getters)]
+#[derive(Getters, Debug)]
 pub struct Action<'r> {
     #[get = "pub"]
     r#type: ActionType,
@@ -110,7 +110,7 @@ impl From<Action<'_>> for Vec<u8> {
 pub enum ActionType {
     Connect,
     Listen,
-    Call,
+    Invoke,
     Leave,
     Create,
 }
@@ -122,7 +122,7 @@ impl TryFrom<&[u8]> for ActionType {
         match value {
             [0] => Ok(ActionType::Connect),
             [1] => Ok(ActionType::Listen),
-            [2] => Ok(ActionType::Call),
+            [2] => Ok(ActionType::Invoke),
             [3] => Ok(ActionType::Create),
             [4] => Ok(ActionType::Leave),
             _ => Err(crate::Error::InvalidActionType),
@@ -135,7 +135,7 @@ impl From<ActionType> for Vec<u8> {
         match value {
             ActionType::Connect => vec![0],
             ActionType::Listen => vec![1],
-            ActionType::Call => vec![2],
+            ActionType::Invoke => vec![2],
             ActionType::Create => vec![3],
             ActionType::Leave => vec![4],
         }
@@ -199,7 +199,7 @@ mod test {
         assert_eq!(head.caller, "345");
 
         let action = request.action;
-        assert_eq!(action.r#type, ActionType::Call);
+        assert_eq!(action.r#type, ActionType::Invoke);
         assert_eq!(action.module, "ns");
         assert_eq!(action.id, "id");
 
@@ -247,7 +247,7 @@ mod test {
 
         let action: Action = action.try_into().unwrap();
 
-        assert_eq!(action.r#type, ActionType::Call);
+        assert_eq!(action.r#type, ActionType::Invoke);
         assert_eq!(action.module, "ns");
         assert_eq!(action.id, "id");
     }

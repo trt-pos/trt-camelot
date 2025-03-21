@@ -1,7 +1,7 @@
 use crate::Head;
 use getset::Getters;
 
-#[derive(Getters)]
+#[derive(Getters, Debug)]
 pub struct Response<'r> {
     #[get = "pub"]
     head: Head<'r>,
@@ -63,7 +63,7 @@ impl<'r> From<Response<'r>> for Vec<u8> {
     }
 }
 
-#[derive(Getters)]
+#[derive(Getters, Debug)]
 pub struct Status {
     #[get = "pub"]
     r#type: StatusType,
@@ -118,6 +118,7 @@ pub enum StatusType {
     EventNotFound,      // 3
     ListenerNotFound,   // 4
     EventAlreadyExists, // 5
+    AlreadySubscribed, // 6
 }
 
 impl TryFrom<i8> for StatusType {
@@ -134,6 +135,7 @@ impl TryFrom<i8> for StatusType {
             3 => Ok(StatusType::EventNotFound),
             4 => Ok(StatusType::ListenerNotFound),
             5 => Ok(StatusType::EventAlreadyExists),
+            6 => Ok(StatusType::AlreadySubscribed),
             _ => Err(crate::Error::InvalidStatus),
         }
     }
@@ -151,6 +153,7 @@ impl From<StatusType> for i8 {
             StatusType::EventNotFound => 3,
             StatusType::ListenerNotFound => 4,
             StatusType::EventAlreadyExists => 5,
+            StatusType::AlreadySubscribed => 6,
         }
     }
 }

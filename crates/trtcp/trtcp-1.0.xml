@@ -75,7 +75,7 @@
                     Subscribe a listener to the designed id
                 </description>
             </value>
-            <value name="call" value="2" >
+            <value name="invoke" value="2" >
                 <requires-body value="yes"/>
                 <description>
                     Invoke all the listeners subscribed to the id. The body content is the data to be sent to the listeners,

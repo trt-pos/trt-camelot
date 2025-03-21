@@ -5,7 +5,7 @@ use std::sync::{Arc, LazyLock};
 use tokio::sync::RwLock;
 use trtcp::{Response, StatusType};
 
-mod call;
+mod invoke;
 mod create;
 mod invalid;
 mod leave;
@@ -28,7 +28,7 @@ impl From<&trtcp::ActionType> for Box<dyn ReqHandler> {
                 Box::from(invalid::InvalidHandler::new(StatusType::AlreadyConnected))
             }
             trtcp::ActionType::Listen => Box::from(listen::ListenHandler),
-            trtcp::ActionType::Call => Box::from(call::CallHandler),
+            trtcp::ActionType::Invoke => Box::from(invoke::InvokeHandler),
             trtcp::ActionType::Leave => Box::from(leave::LeaveHandler),
             trtcp::ActionType::Create => Box::from(create::CreateHandler),
         }

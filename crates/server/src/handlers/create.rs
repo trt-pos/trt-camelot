@@ -2,7 +2,7 @@ use std::future::Future;
 use std::pin::Pin;
 use trtcp::{Request, Response};
 use crate::handlers::{ReqHandler, EVENTS};
-use crate::new_head;
+use server::new_head;
 
 pub(super) struct CreateHandler;
 
@@ -27,7 +27,7 @@ impl ReqHandler for CreateHandler {
                 let mut guard = EVENTS.write().await;
                 guard.insert(event_name, Vec::new());
                 
-                crate::ok_response(request.head().caller())
+                server::ok_response(request.head().caller())
             }
         })
     }

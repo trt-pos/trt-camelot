@@ -2,9 +2,11 @@ use crate::Getters;
 use crate::Head;
 use std::str::Utf8Error;
 
-#[derive(Getters)]
+#[derive(Getters, Debug)]
 pub struct Call<'c> {
+    #[get = "pub"]
     head: Head<'c>,
+    #[get = "pub"]
     body: &'c [u8]
 }
 

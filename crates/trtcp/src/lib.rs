@@ -19,7 +19,7 @@ pub use call::Call;
 use std::str;
 use getset::Getters;
 
-#[derive(Getters)]
+#[derive(Getters, Debug)]
 pub struct Version {
     #[get = "pub"]
     major: u16,
@@ -62,7 +62,7 @@ impl From<Version> for Vec<u8> {
     }
 }
 
-#[derive(Getters)]
+#[derive(Getters, Debug)]
 pub struct Head<'r> {
     #[get = "pub"]
     version: Version,

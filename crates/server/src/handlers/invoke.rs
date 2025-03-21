@@ -1,13 +1,14 @@
 use std::future::Future;
 use std::pin::Pin;
 use tracing::warn;
+use server::{new_head, ok_response};
 use trtcp::{Call, Request, Response};
 use crate::handlers::{ReqHandler, EVENTS};
-use crate::{new_head, CLIENTS};
+use crate::CLIENTS;
 
-pub(super) struct CallHandler;
+pub(super) struct InvokeHandler;
 
-impl ReqHandler for CallHandler {
+impl ReqHandler for InvokeHandler {
     fn handle<'a>(&self, request: &'a Request<'_>) -> Pin<Box<dyn Future<Output = Response<'a>> + Send + 'a>> {
         Box::pin(async move {
             let event_name = format!("{}:{}", request.action().module(), request.action().id());
@@ -27,7 +28,7 @@ impl ReqHandler for CallHandler {
                         );
                     }
                 };
-
+                
                 let call = Call::new(
                     new_head(caller_name),
                     request.body()
@@ -47,10 +48,10 @@ impl ReqHandler for CallHandler {
                     if let Err(e) = client.write_slice(&call_bytes).await {
                         warn!("Failed to send call to client {}: {}", listener, e);
                     }
-                };
+                }
+                
+                ok_response(caller_name)
             }
-            
-            crate::ok_response(caller_name)
         })
     }
 }

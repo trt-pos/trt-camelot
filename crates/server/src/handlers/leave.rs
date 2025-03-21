@@ -1,5 +1,5 @@
 use crate::handlers::{ReqHandler, EVENTS};
-use crate::new_head;
+use server::new_head;
 use std::future::Future;
 use std::pin::Pin;
 use trtcp::{Request, Response};
@@ -28,7 +28,7 @@ impl ReqHandler for LeaveHandler {
                     );
                 };
 
-                if let Some(p) = listeners.iter().position(|l| l == &caller_name) {
+                if let Some(p) = listeners.iter().position(|l| l == caller_name) {
                     p
                 } else {
                     return Response::new(
@@ -44,7 +44,7 @@ impl ReqHandler for LeaveHandler {
                 let listeners = if let Some(vec) = guard.get_mut(&event_name) {
                     vec
                 } else {
-                    return crate::unexpected_error_response(
+                    return server::unexpected_error_response(
                         caller_name,
                         "Event not found after it was found during a leave request",
                     );
@@ -53,7 +53,7 @@ impl ReqHandler for LeaveHandler {
                 listeners.swap_remove(item_position);
             }
 
-            crate::ok_response(caller_name)
+            server::ok_response(caller_name)
         })
     }
 }
