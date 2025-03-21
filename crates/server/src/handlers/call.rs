@@ -2,7 +2,7 @@ use std::future::Future;
 use std::pin::Pin;
 use tracing::warn;
 use trtcp::{Call, Request, Response};
-use crate::handlers::{ok_response, ReqHandler, EVENTS};
+use crate::handlers::{ReqHandler, EVENTS};
 use crate::{new_head, CLIENTS};
 
 pub(super) struct CallHandler;
@@ -50,7 +50,7 @@ impl ReqHandler for CallHandler {
                 };
             }
             
-            ok_response(caller_name)
+            crate::ok_response(caller_name)
         })
     }
 }

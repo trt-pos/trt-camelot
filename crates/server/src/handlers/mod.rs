@@ -3,7 +3,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, LazyLock};
 use tokio::sync::RwLock;
-use trtcp::{Response, Status, StatusType};
+use trtcp::{Response, StatusType};
 
 mod call;
 mod create;
@@ -47,16 +47,4 @@ pub async fn handle_request<'a>(request: &'a trtcp::Request<'_>) -> Response<'a>
 
     let handler: Box<dyn ReqHandler> = request.action().r#type().into();
     handler.handle(&request).await
-}
-
-fn ok_response(caller: &str) -> Response {
-    Response::new(crate::new_head(caller), Status::new(StatusType::OK), "".as_bytes())
-}
-
-fn unexpected_error_response<'a>(caller: &'a str, error_msg: &'a str) -> Response<'a> {
-    Response::new(
-        crate::new_head(caller),
-        Status::new(StatusType::InternalServerError),
-        error_msg.as_bytes(),
-    )
 }

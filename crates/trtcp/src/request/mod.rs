@@ -39,9 +39,8 @@ impl<'r> TryFrom<&'r [u8]> for Request<'r> {
     }
 }
 
-impl TryFrom<Request<'_>> for Vec<u8> {
-    type Error = crate::Error;
-    fn try_from(request: Request) -> Result<Self, Self::Error> {
+impl From<Request<'_>> for Vec<u8> {
+    fn from(request: Request) -> Self {
         let mut result = vec![];
 
         let head_bytes: Vec<u8> = request.head.into();
@@ -56,7 +55,7 @@ impl TryFrom<Request<'_>> for Vec<u8> {
 
         result.extend_from_slice(request.body);
 
-        Ok(result)
+        result
     }
 }
 

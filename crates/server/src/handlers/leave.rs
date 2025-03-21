@@ -44,7 +44,7 @@ impl ReqHandler for LeaveHandler {
                 let listeners = if let Some(vec) = guard.get_mut(&event_name) {
                     vec
                 } else {
-                    return super::unexpected_error_response(
+                    return crate::unexpected_error_response(
                         caller_name,
                         "Event not found after it was found during a leave request",
                     );
@@ -53,7 +53,7 @@ impl ReqHandler for LeaveHandler {
                 listeners.swap_remove(item_position);
             }
 
-            super::ok_response(caller_name)
+            crate::ok_response(caller_name)
         })
     }
 }

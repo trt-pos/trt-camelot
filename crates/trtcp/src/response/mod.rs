@@ -173,7 +173,7 @@ mod test {
             body: "345".as_bytes(),
         };
 
-        let bytes: Vec<u8> = response.try_into().unwrap();
+        let bytes: Vec<u8> = response.into();
 
         let response: Response = bytes.as_slice().try_into().unwrap();
 
@@ -218,7 +218,7 @@ mod test {
             body: "345".as_bytes(),
         };
 
-        let bytes: Vec<u8> = response.try_into().unwrap();
+        let bytes: Vec<u8> = response.into();
 
         assert_eq!(
             bytes,
@@ -247,7 +247,7 @@ mod test {
         let status = Status {
             r#type: StatusType::OK,
         };
-        let bytes: Vec<u8> = status.try_into().unwrap();
+        let bytes: Vec<u8> = status.into();
 
         assert_eq!(bytes, vec![0]);
     }

@@ -28,7 +28,7 @@ impl ReqHandler for ListenHandler {
             };
 
             listeners.push(caller_name.to_string());
-            super::ok_response(caller_name)
+            crate::ok_response(caller_name)
         })
     }
 }
@@ -49,7 +49,7 @@ mod test {
 
         let response = ListenHandler.handle(&request).await;
 
-        assert_eq!(*response.status().r#type(), StatusType::InvalidRequest);
+        assert_eq!(*response.status().r#type(), StatusType::EventNotFound);
 
         let listeners = EVENTS.read().await;
 

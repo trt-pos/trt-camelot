@@ -8,4 +8,8 @@ pub enum Error {
     TrtcpError(#[from] trtcp::Error),
     #[error("IO error: {0}")]
     IOError(#[from] std::io::Error),
+    #[error("No data available from the stream")]
+    NoData,
+    #[error("Connection closed")]
+    ConexionClosed,
 }

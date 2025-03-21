@@ -8,59 +8,106 @@ pub use error::Error;
 // TODO: Hacer un ping para mantener la conexión y cerrarla si no hablo en los ultimos 5 mins
 
 use std::collections::HashMap;
+use std::io::ErrorKind;
 use std::sync::{Arc, LazyLock};
-use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter, ReadHalf, WriteHalf};
+use tokio::io::{AsyncReadExt, AsyncWriteExt, BufWriter};
 use tokio::net::TcpStream;
 use tokio::sync::{Mutex, RwLock};
-use trtcp::{ActionType, Head, Request, Response};
+use trtcp::{ActionType, Head, Request, Response, Status, StatusType};
 
 static CLIENTS: LazyLock<Arc<RwLock<HashMap<String, Client>>>> =
     LazyLock::new(|| Arc::new(RwLock::new(HashMap::new())));
 
 struct Client {
     name: String,
-    reader: Arc<Mutex<ReadHalf<TcpStream>>>,
-    writer: Arc<Mutex<WriteHalf<TcpStream>>>,
+    stream: Arc<Mutex<TcpStream>>,
 }
 
 impl Client {
-    fn new(reader: ReadHalf<TcpStream>, writer: WriteHalf<TcpStream>) -> Self {
-        Self {
-            name: String::new(),
-            reader: Arc::new(Mutex::new(reader)),
-            writer: Arc::new(Mutex::new(writer)),
-        }
+    async fn read<'r, R: TryFrom<&'r [u8], Error = trtcp::Error>>(&self, buf: &'r mut Vec<u8>) -> Result<R, Error> {
+        self.read_blocking(buf, true).await
     }
 
-    async fn read<'r>(&self, buf: &'r mut Vec<u8>) -> Result<Request<'r>, Error> {
+    async fn read_blocking<'r, R: TryFrom<&'r [u8], Error = trtcp::Error>>(&self, buf: &'r mut Vec<u8>, blocking: bool) -> Result<R, Error> {
         buf.clear();
 
-        let mut reader = self.reader.lock().await;
+        {
+            let mut stream_guard = self.stream.lock().await;
+            Self::read_stream(&mut stream_guard, buf, blocking).await?;
+        }
 
-        read_stream(&mut reader, buf).await?;
-
-        let request = Request::try_from(buf.as_slice())?;
-        Ok(request)
+        let result: Result<R, trtcp::Error> = buf.as_slice().try_into();
+        match result {
+            Ok(result) => Ok(result),
+            Err(e) => Err(error::Error::from(e)),
+        }
     }
-
-    async fn write(&self, response: Response<'_>) -> Result<(), Error> {
-        let response_bytes: Vec<u8> = response.into();
+    
+    async fn write<W: Into<Vec<u8>>>(&self, message: W) -> Result<(), Error> {
+        let response_bytes: Vec<u8>= message.into();
 
         self.write_slice(response_bytes.as_slice()).await
     }
 
-    async fn write_slice(&self, slice: &[u8]) -> Result<(), Error> {
-        let mut writer = self.writer.lock().await;
+    async fn write_slice(&self, message: &[u8]) -> Result<(), Error> {
+        {
+            let mut stream = self.stream.lock().await;
+            Self::write_stream(&mut stream, message).await?;
+        }
 
-        write_stream(&mut writer, slice).await?;
         Ok(())
     }
     
     async fn shutdown(&self) -> Result<(), Error> {
-        let mut writer = self.writer.lock().await;
-        writer.shutdown().await?;
+        let mut stream = self.stream.lock().await;
+        stream.shutdown().await?;
 
         Ok(())
+    }
+
+
+    async fn write_stream(writer: &mut TcpStream, bytes: &[u8]) -> Result<(), Error> {
+        let mut writer = BufWriter::new(writer);
+        writer.write_all(bytes).await?;
+
+        writer.flush().await?;
+        Ok(())
+    }
+
+    async fn read_stream(reader: &mut TcpStream, buf: &mut Vec<u8>, blocking: bool) -> Result<(), Error> {
+        loop {
+            let mut tmp_buf = [0; 1024];
+            let size = if blocking {
+                reader.read(&mut tmp_buf).await
+            } else {
+                reader.try_read(&mut tmp_buf)
+            }.map_err(|e| {
+                if e.kind() == ErrorKind::WouldBlock {
+                    Error::NoData
+                } else {
+                    Error::ReadingError
+                }
+            })?;
+            
+            if size == 0 { return Err(Error::ConexionClosed) }
+            
+            buf.extend_from_slice(&tmp_buf[..size]);
+
+            if size < 1024 {
+                break;
+            }
+        }
+        Ok(())
+    }
+
+}
+
+impl From<TcpStream> for Client {
+    fn from(stream: TcpStream) -> Self {
+        Client {
+            name: "".to_string(),
+            stream: Arc::new(Mutex::new(stream))
+        }
     }
 }
 
@@ -105,7 +152,11 @@ async fn handle_client(socket: TcpStream) {
 
             let client_name = client.name.clone();
 
-            CLIENTS.write().await.insert(client.name.clone(), client);
+            {
+                // TODO: Second client can't get the lock
+                let mut clients = CLIENTS.write().await;
+                clients.insert(client.name.clone(), client);
+            }
 
             client_name
         }
@@ -118,19 +169,30 @@ async fn handle_client(socket: TcpStream) {
     let mut buffer = vec![];
 
     loop {
-        let request = {
+        let request: Result<Request, Error> = {
             let guard = CLIENTS.read().await;
             let client = guard.get(&client_name).expect("Client not found");
-
-            if let Ok(request) = client.read(&mut buffer).await {
-                request
-            } else {
-                client.shutdown().await.expect("Could not shutdown client");
-                CLIENTS.write().await.remove(&client_name);
-                break;
+            client.read_blocking(&mut buffer, false).await
+        };
+        
+        let request = match request {
+            Ok(request) => request,
+            Err(e) => {
+                match e {
+                    Error::NoData => continue,
+                    _ => {
+                        let guard = CLIENTS.write().await;
+                        let client = guard.get(&client_name).expect("Client not found");
+                        let _ = client.shutdown().await;
+                        let client_name = client.name.clone();
+                        drop(guard);
+                        CLIENTS.write().await.remove(&client_name);
+                        return;
+                    }
+                }
             }
         };
-
+        
         // Creating a response
         let response = handlers::handle_request(&request).await;
 
@@ -148,19 +210,17 @@ async fn handle_client(socket: TcpStream) {
 }
 
 async fn handle_first_connection(socket: TcpStream) -> Result<Option<Client>, Error> {
-    let (reader, writer) = tokio::io::split(socket);
-    let mut client = Client::new(reader, writer);
+    let mut client = Client::from(socket);
 
     let mut buff = Vec::new();
+    let request: Request = client.read(&mut buff).await?;
 
-    let request = client.read(&mut buff).await?;
-
-    let client_name = request.head().caller().to_string();
+    let client_name = request.head().caller();
 
     if *request.action().r#type() != ActionType::Connect {
         let response = Response::new(
-            new_head(&client_name),
-            trtcp::Status::new(trtcp::StatusType::NeedConnection),
+            new_head(client_name),
+            Status::new(StatusType::NeedConnection),
             "".as_ref(),
         );
 
@@ -168,46 +228,28 @@ async fn handle_first_connection(socket: TcpStream) -> Result<Option<Client>, Er
         client.shutdown().await?;
         Ok(None)
     } else {
-        let response = Response::new(
-            new_head(&client_name),
-            trtcp::Status::new(trtcp::StatusType::OK),
-            "".as_ref(),
-        );
+        let response = ok_response(client_name);
 
-        client.name = client_name.clone();
+        client.name = client_name.to_string();
         client.write(response).await?;
         Ok(Some(client))
     }
 }
 
-async fn read_stream(reader: &mut ReadHalf<TcpStream>, bytes: &mut Vec<u8>) -> Result<(), Error> {
-    let mut reader = BufReader::new(reader);
-    loop {
-        let mut buf = [0; 1024];
-        let size = reader
-            .read(&mut buf)
-            .await
-            .map_err(|_| Error::ReadingError)?;
-        bytes.extend_from_slice(&buf[..size]);
-
-        if size < 1024 {
-            break;
-        }
-    }
-
-    Ok(())
-}
-
-async fn write_stream(writer: &mut WriteHalf<TcpStream>, bytes: &[u8]) -> Result<(), Error> {
-    let mut writer = BufWriter::new(writer);
-    writer.write_all(bytes).await?;
-
-    writer.flush().await?;
-    Ok(())
-}
-
 fn new_head(caller: &str) -> Head {
     Head::new(trtcp::Version::actual(), caller)
+}
+
+fn ok_response(caller: &str) -> Response {
+    Response::new(new_head(caller), Status::new(StatusType::OK), "".as_bytes())
+}
+
+fn unexpected_error_response<'a>(caller: &'a str, error_msg: &'a str) -> Response<'a> {
+    Response::new(
+        new_head(caller),
+        Status::new(StatusType::InternalServerError),
+        error_msg.as_bytes(),
+    )
 }
 
 #[cfg(test)]
@@ -221,13 +263,13 @@ mod test {
         });
 
         for i in 0..10 {
-            let client = TcpStream::connect("localhost:1237")
-                .await
-                .expect("Could not connect");
+            let client = Client::from(
+                TcpStream::connect("localhost:1237")
+                    .await
+                    .expect("Could not connect"),
+            );
 
             let client_name = format!("test{}", i);
-
-            let (mut reader, mut writer) = tokio::io::split(client);
 
             let request = Request::new(
                 Head::new(trtcp::Version::actual(), &client_name),
@@ -235,18 +277,13 @@ mod test {
                 "".as_bytes(),
             );
 
-            let request_bytes: Vec<u8> = request.try_into().unwrap();
-            write_stream(&mut writer, request_bytes.as_slice())
-                .await
-                .expect("Could not write");
+            client.write(request).await.expect("Could not write");
 
-            let mut buf = vec![0; 1024];
-            let size = reader.read(&mut buf).await.unwrap();
-
-            let response = Response::try_from(&buf[..size]).unwrap();
-
+            let mut buf = vec![0u8; 1024];
+            let response: Response = client.read(&mut buf).await.expect("Could not read");
+            
             assert_eq!(response.head().caller(), client_name);
-            assert_eq!(*response.status().r#type(), trtcp::StatusType::OK);
+            assert_eq!(*response.status().r#type(), StatusType::OK);
             assert!(CLIENTS.read().await.contains_key(&client_name));
         }
 
