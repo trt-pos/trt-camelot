@@ -3,7 +3,6 @@
 mod error;
 mod request;
 mod response;
-mod call;
 
 pub use error::Error;
 pub use request::Request;
@@ -14,10 +13,10 @@ pub use response::Response;
 pub use response::Status;
 pub use response::StatusType;
 
-pub use call::Call;
-
 use std::str;
 use getset::Getters;
+
+const SEPARATOR_BYTE: u8 = 0x1F;
 
 #[derive(Getters, Debug)]
 pub struct Version {
@@ -118,7 +117,7 @@ mod test {
             caller: "345",
         };
 
-        let bytes: Vec<u8> = head.try_into().unwrap();
+        let bytes: Vec<u8> = head.into();
 
         assert_eq!(
             bytes,

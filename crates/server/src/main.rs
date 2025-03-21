@@ -101,7 +101,7 @@ async fn handle_client(socket: TcpStream) {
             let client = guard.get(&client_name).expect("Client not found");
 
             if client.write(response).await.is_err() {
-                client.shutdown().await.expect("Could not shutdown client");
+                let _ = client.shutdown().await;
                 CLIENTS.write().await.remove(&client_name);
                 break;
             }

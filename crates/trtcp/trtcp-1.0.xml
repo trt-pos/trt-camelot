@@ -1,5 +1,6 @@
 <protocol byte-order="big-endian" version="1.0">
     <requests>
+        <msg-type value="0" />
         <head>
             <field name="version" type="u16" />
             <field name="patch" type="u16" />
@@ -26,6 +27,7 @@
         </body>
     </requests>
     <responses>
+        <msg-type value="1" />
         <head>
             <field name="version" type="u16" />
             <field name="patch" type="u16" />
@@ -45,21 +47,12 @@
             <field name="response-data" type="[u8]" />
         </body>
     </responses>
-    <calls>
-        <head>
-            <field name="version" type="u16" />
-            <field name="patch" type="u16" />
-            <field name="caller" type="string" >
-                <description>
-                    The caller is the name of the event that is being listened to when receiving a call
-                </description>
-            </field>
-        </head>
-        <unit-separator value="0x1F"/>
-        <body>
-            <field name="call-data" type="[u8]" />
-        </body>
-    </calls>
+    <msg-type type="u8">
+        <values>
+            <value name="request" value="0" />
+            <value name="response" value="1" />
+        </values>
+    </msg-type>
     <action-type type="u8">
         <values>
             <value name="connect" value="0" >
@@ -83,7 +76,7 @@
                 </description>
             </value>
             <value name="create" value="3" >
-                <requires-body value="yes"/>
+                <requires-body value="no"/>
                 <description>
                     Create a new listener with the provided id
                 </description>
@@ -94,6 +87,14 @@
                     Unsubscribe the listener from the id
                 </description>
             </value>
+            <value name="callback" value="5" >
+                <requires-body value="yes"/>
+                <description>
+                    The server sends this type of request to the clients listening to the event
+                    This is the only Request type that the server can send to the client,
+                    the client can't send it to the server
+                </description>
+            </value>
         </values>
     </action-type>
     <status-code type="i8">
@@ -101,8 +102,13 @@
             <value name="OK" value="0" />
             <value name="GenericError" value="-1" />
             <value name="NeedConnection" value="-2" />
+            <value name="InternalServerError" value="-3" />
             <value name="AlreadyConnected" value="1" />
             <value name="InvalidRequest" value="2" />
+            <value name="EventNotFound" value="3" />
+            <value name="ListenerNotFound" value="4" />
+            <value name="EventAlreadyExists" value="5" />
+            <value name="AlreadySubscribed" value="6" />
         </values>
     </status-code>
 </protocol>

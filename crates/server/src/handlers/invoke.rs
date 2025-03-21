@@ -2,7 +2,7 @@ use std::future::Future;
 use std::pin::Pin;
 use tracing::warn;
 use server::{new_head, ok_response};
-use trtcp::{Call, Request, Response};
+use trtcp::{Action, ActionType, Request, Response};
 use crate::handlers::{ReqHandler, EVENTS};
 use crate::CLIENTS;
 
@@ -29,12 +29,13 @@ impl ReqHandler for InvokeHandler {
                     }
                 };
                 
-                let call = Call::new(
+                let callback_request = Request::new(
                     new_head(caller_name),
-                    request.body()
+                    Action::new(ActionType::Callback, request.action().module(), request.action().id()),
+                    *request.body()
                 );
 
-                let call_bytes: Vec<u8> = call.into();
+                let call_bytes: Vec<u8> = callback_request.into();
                 
                 let guard = CLIENTS.read().await;
                 for listener in listeners.iter() {
@@ -46,7 +47,7 @@ impl ReqHandler for InvokeHandler {
                     };
                     
                     if let Err(e) = client.write_slice(&call_bytes).await {
-                        warn!("Failed to send call to client {}: {}", listener, e);
+                        warn!("Failed to send callback_request to client {}: {}", listener, e);
                     }
                 }
                 

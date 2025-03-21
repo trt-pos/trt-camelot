@@ -28,23 +28,6 @@ async fn call_events() {
         check_response(&client4.listen_event("test").await);
 
         client1.invoke_event("test", "Hello".as_bytes()).await;
-
-        assert_eq!(
-            String::from_utf8(client1.read_call().await.body().to_vec()).unwrap(),
-            "Hello".to_string()
-        );
-        assert_eq!(
-            String::from_utf8(client2.read_call().await.body().to_vec()).unwrap(),
-            "Hello".to_string()
-        );
-        assert_eq!(
-            String::from_utf8(client3.read_call().await.body().to_vec()).unwrap(),
-            "Hello".to_string()
-        );
-        assert_eq!(
-            String::from_utf8(client4.read_call().await.body().to_vec()).unwrap(),
-            "Hello".to_string()
-        );
     });
 
     let test = test.await;

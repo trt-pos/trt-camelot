@@ -1,5 +1,7 @@
-use crate::Head;
+use crate::{Head, SEPARATOR_BYTE};
 use getset::Getters;
+
+const START_BYTE: u8 = 0x01;
 
 #[derive(Getters, Debug)]
 pub struct Response<'r> {
@@ -29,7 +31,12 @@ impl<'r> TryFrom<&'r [u8]> for Response<'r> {
     type Error = crate::Error;
 
     fn try_from(response: &'r [u8]) -> Result<Self, Self::Error> {
-        let split_response = response.split(|&x| x == 0x1F).collect::<Vec<&[u8]>>();
+        let (start_byte, response) = response.split_at(size_of::<u8>());
+
+        if start_byte[0] != START_BYTE {
+            return Err(crate::Error::InvalidRequest);
+        }
+        let split_response = response.split(|&x| x == SEPARATOR_BYTE).collect::<Vec<&[u8]>>();
 
         if split_response.len() != 3 {
             return Err(crate::Error::InvalidResponse);
@@ -45,7 +52,7 @@ impl<'r> TryFrom<&'r [u8]> for Response<'r> {
 
 impl<'r> From<Response<'r>> for Vec<u8> {
     fn from(response: Response<'r>) -> Self {
-        let mut result = vec![];
+        let mut result = vec![1];
 
         let head_bytes: Vec<u8> = response.head.into();
         result.extend(head_bytes);
@@ -190,6 +197,7 @@ mod test {
     #[test]
     fn test_bytes_into_response() {
         let response: &[u8] = &[
+            START_BYTE,
             0, 1, // major (1)
             0, 2, // patch (2)
             51, 52, 53,   // caller ("345")
@@ -226,6 +234,7 @@ mod test {
         assert_eq!(
             bytes,
             vec![
+                START_BYTE,
                 0, 1, // major (1)
                 0, 2, // patch (2)
                 51, 52, 53,   // caller ("345")

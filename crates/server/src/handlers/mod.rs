@@ -10,6 +10,7 @@ mod create;
 mod invalid;
 mod leave;
 mod listen;
+mod callback;
 
 static EVENTS: LazyLock<Arc<RwLock<HashMap<String, Vec<String>>>>> =
     LazyLock::new(|| Arc::new(RwLock::new(HashMap::new())));
@@ -31,6 +32,7 @@ impl From<&trtcp::ActionType> for Box<dyn ReqHandler> {
             trtcp::ActionType::Invoke => Box::from(invoke::InvokeHandler),
             trtcp::ActionType::Leave => Box::from(leave::LeaveHandler),
             trtcp::ActionType::Create => Box::from(create::CreateHandler),
+            &trtcp::ActionType::Callback => Box::from(callback::CallbackHandler),
         }
     }
 }

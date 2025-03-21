@@ -1,5 +1,7 @@
-use crate::Head;
+use crate::{Head, SEPARATOR_BYTE};
 use getset::Getters;
+
+const START_BYTE: u8 = 0x00;
 
 #[derive(Getters, Debug)]
 pub struct Request<'r> {
@@ -24,7 +26,13 @@ impl Request<'_> {
 impl<'r> TryFrom<&'r [u8]> for Request<'r> {
     type Error = crate::Error;
     fn try_from(request: &'r [u8]) -> Result<Self, Self::Error> {
-        let split_request = request.split(|&x| x == 0x1F).collect::<Vec<&[u8]>>();
+        let (start_byte, request) = request.split_at(size_of::<u8>());
+        
+        if start_byte[0] != START_BYTE {
+            return Err(crate::Error::InvalidRequest);
+        }
+        
+        let split_request = request.split(|&x| x == SEPARATOR_BYTE).collect::<Vec<&[u8]>>();
 
         if split_request.len() != 3 {
             return Err(crate::Error::InvalidRequest);
@@ -41,7 +49,7 @@ impl<'r> TryFrom<&'r [u8]> for Request<'r> {
 
 impl From<Request<'_>> for Vec<u8> {
     fn from(request: Request) -> Self {
-        let mut result = vec![];
+        let mut result = vec![0];
 
         let head_bytes: Vec<u8> = request.head.into();
         result.extend(head_bytes);
@@ -113,6 +121,7 @@ pub enum ActionType {
     Invoke,
     Leave,
     Create,
+    Callback,
 }
 
 impl TryFrom<&[u8]> for ActionType {
@@ -125,6 +134,7 @@ impl TryFrom<&[u8]> for ActionType {
             [2] => Ok(ActionType::Invoke),
             [3] => Ok(ActionType::Create),
             [4] => Ok(ActionType::Leave),
+            [5] => Ok(ActionType::Callback),
             _ => Err(crate::Error::InvalidActionType),
         }
     }
@@ -138,6 +148,7 @@ impl From<ActionType> for Vec<u8> {
             ActionType::Invoke => vec![2],
             ActionType::Create => vec![3],
             ActionType::Leave => vec![4],
+            ActionType::Callback => vec![5],
         }
     }
 }
@@ -181,6 +192,7 @@ mod test {
     #[test]
     fn test_bytes_into_request() {
         let request: &[u8] = &[
+            START_BYTE,
             0, 1, // major (1)
             0, 2, // patch (2)
             51, 52, 53,   // caller ("345")
@@ -226,6 +238,7 @@ mod test {
         assert_eq!(
             bytes,
             vec![
+                START_BYTE,
                 0, 1, // major (1)
                 0, 2, // patch (2)
                 51, 52, 53,   // caller ("345")

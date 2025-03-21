@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use server::Client;
 use tokio::net::TcpStream;
-use trtcp::Call;
 
 pub struct TestClient {
     client: Client,
@@ -72,10 +71,6 @@ impl TestClient {
 
         self.client.write(request).await.unwrap();
 
-        self.client.read_and_wait(&mut self.buff).await.unwrap()
-    }
-    
-    pub async fn read_call(&mut self) -> Call {
         self.client.read_and_wait(&mut self.buff).await.unwrap()
     }
 }
