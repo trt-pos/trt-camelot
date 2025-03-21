@@ -28,16 +28,28 @@ async fn call_events() {
         check_response(&client4.listen_event("test").await);
 
         client1.invoke_event("test", "Hello".as_bytes()).await;
-    });
+        
+        check_callback(&client1.read_request().await, "Hello".as_bytes());
+        check_callback(&client2.read_request().await, "Hello".as_bytes());
+        check_callback(&client3.read_request().await, "Hello".as_bytes());
+        check_callback(&client4.read_request().await, "Hello".as_bytes());
+        
+        check_response(&client1.read_response().await);
+    }).await;
 
-    let test = test.await;
     server::stop_server().await;
 
-    assert!(test.is_ok())
+    assert!(test.is_ok());
 }
 
 fn check_response(response: &trtcp::Response) {
     if *response.status().r#type() != trtcp::StatusType::OK {
         panic!("Response status is not OK: {:?}", response);
+    }
+}
+
+fn check_callback(request: &trtcp::Request, body: &[u8]) {
+    if *request.body() != body {
+        panic!("Response body is not equal to expected: {:?} != {:?}", request.body(), body);
     }
 }

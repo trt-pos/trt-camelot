@@ -1,12 +1,16 @@
+use std::cell::LazyCell;
 use std::collections::HashMap;
 use std::ops::Deref;
+use std::sync::{Arc, LazyLock, Mutex};
+use std::sync::atomic::AtomicU64;
+use std::thread;
+use std::time::Duration;
 use server::Client;
 use tokio::net::TcpStream;
 
 pub struct TestClient {
-    client: Client,
+    client: Arc<Client>,
     buff: Vec<u8>,
-    event_handlers: HashMap<String, Vec<Box<dyn Fn(&[u8]) + Send>>>
 }
 
 impl TestClient {
@@ -20,14 +24,26 @@ impl TestClient {
         client.set_name(name.to_string());
         
         Self {
-            client,
+            client: Arc::new(client),
             buff: Vec::new(),
-            event_handlers: HashMap::new()
         }
     }
 }
 
+
+struct ByteStream(Vec<u8>);
+
+impl TryFrom<&[u8]> for ByteStream {
+    type Error = trtcp::Error;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        let vec = Vec::from(value);
+        Ok(ByteStream(vec))
+    }
+}
+
 impl TestClient {
+    
     pub async fn establish_connection(&mut self) -> trtcp::Response {
         let request = trtcp::Request::new(
             trtcp::Head::new(trtcp::Version::actual(), self.client.name()),
@@ -71,6 +87,14 @@ impl TestClient {
 
         self.client.write(request).await.unwrap();
 
+        self.client.read_and_wait(&mut self.buff).await.unwrap()
+    }
+    
+    pub async fn read_response(&mut self) -> trtcp::Response {
+        self.client.read_and_wait(&mut self.buff).await.unwrap()
+    }
+    
+    pub async fn read_request(&mut self) -> trtcp::Request {
         self.client.read_and_wait(&mut self.buff).await.unwrap()
     }
 }
