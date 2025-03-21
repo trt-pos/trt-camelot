@@ -117,22 +117,31 @@ async fn handle_first_connection(socket: TcpStream) -> Result<Option<Client>, Er
 
     let client_name = request.head().caller();
 
-    if *request.action().r#type() != ActionType::Connect {
-        let response = Response::new(
-            server::new_head(client_name),
-            Status::new(StatusType::NeedConnection),
-            "".as_ref(),
-        );
+    match request.action().r#type() { 
+        ActionType::Connect => {
+            let response = server::ok_response(client_name);
 
-        client.write(response).await?;
-        client.shutdown().await?;
-        Ok(None)
-    } else {
-        let response = server::ok_response(client_name);
+            client.set_name(client_name.to_string());
+            client.write(response).await?;
+            Ok(Some(client))
+        }
+        ActionType::Invoke => {
+            let response = handlers::handle_request(&request).await;
+            client.write(response).await?;
+            client.shutdown().await?;
+            Ok(None)
+        }
+        _ => {
+            let response = Response::new(
+                server::new_head(client_name),
+                Status::new(StatusType::NeedConnection),
+                "".as_ref(),
+            );
 
-        client.set_name(client_name.to_string());
-        client.write(response).await?;
-        Ok(Some(client))
+            client.write(response).await?;
+            client.shutdown().await?;
+            Ok(None)
+        }
     }
 }
 
