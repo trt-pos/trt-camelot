@@ -18,7 +18,7 @@ async fn main() {
     let args: Vec<String> = std::env::args().collect();
 
     let port = if args.len() == 2 {
-        args[2].parse().expect("Invalid port")
+        args[1].parse().expect("Invalid port")
     } else {
         1237
     };
