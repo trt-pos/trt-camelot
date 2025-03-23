@@ -80,7 +80,8 @@ impl<'r> From<Response<'r>> for Vec<u8> {
         let length = (result.len() as u32).to_be_bytes();
         let msg_type = START_BYTE.to_be_bytes();
         
-        let mut final_result = vec![];
+        // TODO: Convert into an array of bytes allocated in the heap
+        let mut final_result = Vec::with_capacity(5 + result.len());
         final_result.extend_from_slice(&msg_type);
         final_result.extend_from_slice(&length);
         final_result.extend_from_slice(&result);
