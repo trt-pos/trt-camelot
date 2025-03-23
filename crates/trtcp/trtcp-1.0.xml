@@ -1,7 +1,9 @@
 <protocol byte-order="big-endian" version="1.0">
     <requests>
-        <msg-type type="u8" value="0" />
-        <length type="u32" notes="length after this 4 bytes"/>
+        <prefix>
+            <msg-type type="u8" value="0" />
+            <length type="u32" notes="length after this 4 bytes"/>
+        </prefix>
         <head>
             <field name="version" type="u16" />
             <field name="patch" type="u16" />
@@ -28,8 +30,10 @@
         </body>
     </requests>
     <responses>
-        <msg-type type="u8" value="1" />
-        <length type="u32" notes="length after this 4 bytes"/>
+        <prefix>
+            <msg-type type="u8" value="1" />
+            <length type="u32" notes="length after this 4 bytes"/>
+        </prefix>
         <head>
             <field name="version" type="u16" />
             <field name="patch" type="u16" />
