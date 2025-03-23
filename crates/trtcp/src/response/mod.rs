@@ -34,7 +34,7 @@ impl<'r> TryFrom<&'r [u8]> for Response<'r> {
         let (start_byte, response) = response.split_at(size_of::<u8>());
 
         if start_byte[0] != START_BYTE {
-            return Err(crate::Error::InvalidRequest);
+            return Err(crate::Error::InvalidResponse);
         }
         
         let (length_bytes, response) = response.split_at(size_of::<u32>());

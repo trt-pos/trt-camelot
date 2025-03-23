@@ -39,7 +39,7 @@ impl<'r> TryFrom<&'r [u8]> for Request<'r> {
         ) as usize;
 
         if length != request.len() {
-            return Err(crate::Error::InvalidResponse);
+            return Err(crate::Error::InvalidRequest);
         }
         
         let split_request = request.split(|&x| x == SEPARATOR_BYTE).collect::<Vec<&[u8]>>();
