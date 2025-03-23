@@ -1,10 +1,10 @@
 mod error;
 
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use tokio::net::TcpStream;
-use tokio::io::{AsyncReadExt, AsyncWriteExt, BufWriter};
 use std::io::ErrorKind;
+use std::sync::Arc;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
+use tokio::sync::Mutex;
 use trtcp::{Head, Response, Status, StatusType};
 
 pub use error::Error;
@@ -57,9 +57,7 @@ impl Client {
     }
     
     async fn write_stream(writer: &mut TcpStream, bytes: &[u8]) -> Result<(), Error> {
-        let mut writer = BufWriter::new(writer);
         writer.write_all(bytes).await?;
-
         writer.flush().await?;
         Ok(())
     }

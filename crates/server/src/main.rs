@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, LazyLock};
 use tokio::net::TcpStream;
 use tokio::sync::RwLock;
+use tracing::error;
 use server::{Client, Error};
 use trtcp::{ActionType, Request, Response, Status, StatusType};
 
@@ -38,7 +39,7 @@ pub async fn start_server(port: u16) {
                     handle_client(socket).await;
                 });
             }
-            Err(e) => println!("couldn't get client: {:?}", e),
+            Err(e) => error!("couldn't accept client connection: {:?}", e),
         }
     }
 }
@@ -61,7 +62,7 @@ async fn handle_client(socket: TcpStream) {
             client_name
         }
         Err(e) => {
-            eprintln!("Error: {}", e);
+            error!("{:?}", e);
             return;
         }
     };
@@ -101,6 +102,7 @@ async fn handle_client(socket: TcpStream) {
             let client = guard.get(&client_name).expect("Client not found");
 
             if client.write(response).await.is_err() {
+                error!("Error writing response to client {}", client_name);
                 let _ = client.shutdown().await;
                 CLIENTS.write().await.remove(&client_name);
                 break;
