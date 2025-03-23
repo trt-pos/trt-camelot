@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 mod client;
 mod server;
 

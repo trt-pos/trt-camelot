@@ -31,6 +31,16 @@ impl<'r> TryFrom<&'r [u8]> for Request<'r> {
         if start_byte[0] != START_BYTE {
             return Err(crate::Error::InvalidRequest);
         }
+
+        let (length_bytes, request) = request.split_at(size_of::<u32>());
+
+        let length = u32::from_be_bytes(
+            length_bytes.try_into().map_err(|_| crate::Error::InvalidHead)?,
+        ) as usize;
+
+        if length != request.len() {
+            return Err(crate::Error::InvalidResponse);
+        }
         
         let split_request = request.split(|&x| x == SEPARATOR_BYTE).collect::<Vec<&[u8]>>();
 
@@ -40,7 +50,6 @@ impl<'r> TryFrom<&'r [u8]> for Request<'r> {
 
         let head = split_request[0].try_into()?;
         let action = split_request[1].try_into()?;
-
         let body = split_request[2];
 
         Ok(Request { head, action, body })
@@ -49,7 +58,7 @@ impl<'r> TryFrom<&'r [u8]> for Request<'r> {
 
 impl From<Request<'_>> for Vec<u8> {
     fn from(request: Request) -> Self {
-        let mut result = vec![0];
+        let mut result = vec![];
 
         let head_bytes: Vec<u8> = request.head.into();
         result.extend(head_bytes);
@@ -63,7 +72,15 @@ impl From<Request<'_>> for Vec<u8> {
 
         result.extend_from_slice(request.body);
 
-        result
+        let length = (result.len() as u32).to_be_bytes();
+        let msg_type = START_BYTE.to_be_bytes();
+
+        let mut final_result = vec![];
+        final_result.extend_from_slice(&msg_type);
+        final_result.extend_from_slice(&length);
+        final_result.extend_from_slice(&result);
+
+        final_result
     }
 }
 
@@ -172,7 +189,7 @@ mod test {
             body: "hello".as_bytes(),
         };
 
-        let bytes: Vec<u8> = request.try_into().unwrap();
+        let bytes: Vec<u8> = request.into();
 
         let request = Request::try_from(&bytes[..]).unwrap();
 
@@ -193,6 +210,7 @@ mod test {
     fn test_bytes_into_request() {
         let request: &[u8] = &[
             START_BYTE,
+            0, 0, 0, 20, // length (20)
             0, 1, // major (1)
             0, 2, // patch (2)
             51, 52, 53,   // caller ("345")
@@ -233,12 +251,13 @@ mod test {
             body: "hello".as_bytes(),
         };
 
-        let bytes: Vec<u8> = request.try_into().unwrap();
+        let bytes: Vec<u8> = request.into();
 
         assert_eq!(
             bytes,
             vec![
                 START_BYTE,
+                0, 0, 0, 20,
                 0, 1, // major (1)
                 0, 2, // patch (2)
                 51, 52, 53,   // caller ("345")
@@ -273,7 +292,7 @@ mod test {
             id: "id",
         };
 
-        let bytes: Vec<u8> = action.try_into().unwrap();
+        let bytes: Vec<u8> = action.into();
 
         assert_eq!(
             bytes,

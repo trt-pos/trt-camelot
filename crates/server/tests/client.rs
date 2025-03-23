@@ -1,11 +1,5 @@
-use std::cell::LazyCell;
-use std::collections::HashMap;
-use std::ops::Deref;
-use std::sync::{Arc, LazyLock, Mutex};
-use std::sync::atomic::AtomicU64;
-use std::thread;
-use std::time::Duration;
 use server::Client;
+use std::sync::Arc;
 use tokio::net::TcpStream;
 
 pub struct TestClient {
@@ -27,18 +21,6 @@ impl TestClient {
             client: Arc::new(client),
             buff: Vec::new(),
         }
-    }
-}
-
-
-struct ByteStream(Vec<u8>);
-
-impl TryFrom<&[u8]> for ByteStream {
-    type Error = trtcp::Error;
-
-    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        let vec = Vec::from(value);
-        Ok(ByteStream(vec))
     }
 }
 

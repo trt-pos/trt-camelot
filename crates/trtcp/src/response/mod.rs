@@ -36,6 +36,17 @@ impl<'r> TryFrom<&'r [u8]> for Response<'r> {
         if start_byte[0] != START_BYTE {
             return Err(crate::Error::InvalidRequest);
         }
+        
+        let (length_bytes, response) = response.split_at(size_of::<u32>());
+        
+        let length = u32::from_be_bytes(
+            length_bytes.try_into().map_err(|_| crate::Error::InvalidHead)?,
+        ) as usize;
+        
+        if length != response.len() { 
+            return Err(crate::Error::InvalidResponse);
+        }
+        
         let split_response = response.split(|&x| x == SEPARATOR_BYTE).collect::<Vec<&[u8]>>();
 
         if split_response.len() != 3 {
@@ -52,7 +63,7 @@ impl<'r> TryFrom<&'r [u8]> for Response<'r> {
 
 impl<'r> From<Response<'r>> for Vec<u8> {
     fn from(response: Response<'r>) -> Self {
-        let mut result = vec![1];
+        let mut result = vec![];
 
         let head_bytes: Vec<u8> = response.head.into();
         result.extend(head_bytes);
@@ -66,7 +77,15 @@ impl<'r> From<Response<'r>> for Vec<u8> {
 
         result.extend_from_slice(response.body);
         
-        result
+        let length = (result.len() as u32).to_be_bytes();
+        let msg_type = START_BYTE.to_be_bytes();
+        
+        let mut final_result = vec![];
+        final_result.extend_from_slice(&msg_type);
+        final_result.extend_from_slice(&length);
+        final_result.extend_from_slice(&result);
+        
+        final_result
     }
 }
 
@@ -198,6 +217,7 @@ mod test {
     fn test_bytes_into_response() {
         let response: &[u8] = &[
             START_BYTE,
+            0, 0, 0, 13, // length (13)
             0, 1, // major (1)
             0, 2, // patch (2)
             51, 52, 53,   // caller ("345")
@@ -235,6 +255,7 @@ mod test {
             bytes,
             vec![
                 START_BYTE,
+                0, 0, 0, 13, // length (13)
                 0, 1, // major (1)
                 0, 2, // patch (2)
                 51, 52, 53,   // caller ("345")
