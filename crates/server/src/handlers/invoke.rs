@@ -38,14 +38,14 @@ impl ReqHandler for InvokeHandler {
                 
                 let guard = CLIENT_WRITERS.read().await;
                 for listener in listeners.iter() {
-                    let client = if let Some(c) = guard.get(listener) {
-                        c
+                    let mut writer = if let Some(c) = guard.get(listener) {
+                        c.lock().await
                     } else {
                         warn!("Client {} not found but is registered as a listener", listener);
                         continue
                     };
                     
-                    if let Err(e) = client.write_slice(&call_bytes).await {
+                    if let Err(e) = writer.write_slice(&call_bytes).await {
                         warn!("Failed to send callback_request to client {}: {}", listener, e);
                     }
                 }

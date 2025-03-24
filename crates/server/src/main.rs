@@ -42,8 +42,7 @@ pub async fn start_server(port: u16) {
     }
 }
 
-async fn handle_client(mut socket: TcpStream) {
-    let socket = &mut socket;
+async fn handle_client(socket: TcpStream) {
     let (mut reader, client_name) = match handle_first_connection(socket).await {
         Ok(o) => {
             let (reader, writer, caller_name) = match o {
@@ -67,7 +66,7 @@ async fn handle_client(mut socket: TcpStream) {
     let mut buffer = vec![];
 
     loop {
-        let request: Result<Request, Error> = reader.read(&mut buffer, false).await;
+        let request: Result<Request, Error> = reader.read(&mut buffer).await;
 
         let request = match request {
             Ok(request) => request,
@@ -120,12 +119,12 @@ async fn handle_client(mut socket: TcpStream) {
 }
 
 async fn handle_first_connection(
-    socket: &mut TcpStream,
+    socket: TcpStream,
 ) -> Result<Option<(ReadHalfClient, WriteHalfClient, String)>, Error> {
     let (mut reader, mut writer) = server::split(socket, "tmp").await;
 
     let mut buff = Vec::new();
-    let request: Request = reader.read_and_wait(&mut buff).await?;
+    let request: Request = reader.read(&mut buff).await?;
 
     let client_name = request.head().caller();
 
@@ -172,11 +171,12 @@ mod test {
         });
 
         for i in 0..10 {
-            let client = Client::from(
+            let (mut reader, mut writer) = server::split(
                 TcpStream::connect("localhost:1237")
                     .await
                     .expect("Could not connect"),
-            );
+                "unknown",
+            ).await;
 
             let client_name = format!("test{}", i);
 
@@ -186,11 +186,11 @@ mod test {
                 "".as_bytes(),
             );
 
-            client.write(request).await.expect("Could not write");
+            writer.write(request).await.expect("Could not write");
 
             let mut buf = vec![0u8; 1024];
-            let response: Response = client
-                .read_and_wait(&mut buf)
+            let response: Response = reader
+                .read(&mut buf)
                 .await
                 .expect("Could not read");
 
