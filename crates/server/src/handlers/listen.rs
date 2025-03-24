@@ -1,8 +1,7 @@
 use crate::handlers::{ReqHandler, EVENTS};
-use server::new_head;
 use std::future::Future;
 use std::pin::Pin;
-use trtcp::{Request, Response};
+use trtcp::{Head, Request, Response};
 
 pub(super) struct ListenHandler;
 
@@ -22,7 +21,7 @@ impl ReqHandler for ListenHandler {
                     l
                 } else {
                     return Response::new(
-                        new_head(caller_name),
+                        Head::new_with_version(caller_name),
                         trtcp::Status::new(trtcp::StatusType::EventNotFound),
                         "".as_bytes(),
                     );
@@ -33,7 +32,7 @@ impl ReqHandler for ListenHandler {
             
             if already_subscribed {
                 return Response::new(
-                    new_head(caller_name),
+                    Head::new_with_version(caller_name),
                     trtcp::Status::new(trtcp::StatusType::AlreadySubscribed),
                     "".as_bytes(),
                 );
@@ -45,13 +44,13 @@ impl ReqHandler for ListenHandler {
                     l
                 } else {
                     return Response::new(
-                        new_head(caller_name),
+                        Head::new_with_version(caller_name),
                         trtcp::Status::new(trtcp::StatusType::EventNotFound),
                         "".as_bytes(),
                     );
                 };
                 listeners.push(caller_name.to_string());
-                server::ok_response(caller_name)
+                Response::new_ok(caller_name)
             }
         })
     }

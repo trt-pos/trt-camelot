@@ -1,8 +1,7 @@
 use std::future::Future;
 use std::pin::Pin;
-use trtcp::{Request, Response};
+use trtcp::{Head, Request, Response};
 use crate::handlers::{ReqHandler, EVENTS};
-use server::new_head;
 
 pub(super) struct CreateHandler;
 
@@ -16,7 +15,7 @@ impl ReqHandler for CreateHandler {
                 
                 if guard.get(&event_name).is_some() {
                     return Response::new(
-                        new_head(request.head().caller()),
+                        Head::new_with_version(request.head().caller()),
                         trtcp::Status::new(trtcp::StatusType::EventAlreadyExists),
                         "".as_bytes(),
                     );
@@ -27,7 +26,7 @@ impl ReqHandler for CreateHandler {
                 let mut guard = EVENTS.write().await;
                 guard.insert(event_name, Vec::new());
                 
-                server::ok_response(request.head().caller())
+                Response::new_ok(request.head().caller())
             }
         })
     }

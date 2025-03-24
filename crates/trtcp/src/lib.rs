@@ -5,16 +5,16 @@ mod request;
 mod response;
 
 pub use error::Error;
-pub use request::Request;
 pub use request::Action;
 pub use request::ActionType;
+pub use request::Request;
 
 pub use response::Response;
 pub use response::Status;
 pub use response::StatusType;
 
-use std::str;
 use getset::Getters;
+use std::str;
 
 const SEPARATOR_BYTE: u8 = 0x1F;
 
@@ -30,7 +30,7 @@ impl Version {
     pub fn new(major: u16, patch: u16) -> Self {
         Version { major, patch }
     }
-    
+
     pub fn actual() -> Self {
         Version { major: 1, patch: 0 }
     }
@@ -72,7 +72,14 @@ impl Head<'_> {
     pub fn new(version: Version, caller: &str) -> Head {
         Head { version, caller }
     }
-    
+
+    pub fn new_with_version(caller: &str) -> Head {
+        Head {
+            version: Version::actual(),
+            caller,
+        }
+    }
+
     pub fn caller(&self) -> &str {
         self.caller
     }
@@ -92,7 +99,6 @@ impl<'a> TryFrom<&'a [u8]> for Head<'a> {
 }
 
 impl From<Head<'_>> for Vec<u8> {
-
     fn from(head: Head<'_>) -> Self {
         let mut result = Vec::new();
 

@@ -1,10 +1,9 @@
 use std::future::Future;
 use std::pin::Pin;
 use tracing::warn;
-use server::{new_head, ok_response};
-use trtcp::{Action, ActionType, Request, Response};
+use trtcp::{Action, ActionType, Head, Request, Response};
 use crate::handlers::{ReqHandler, EVENTS};
-use crate::CLIENTS;
+use crate::CLIENT_WRITERS;
 
 pub(super) struct InvokeHandler;
 
@@ -22,7 +21,7 @@ impl ReqHandler for InvokeHandler {
                         l
                     } else {
                         return Response::new(
-                            new_head(request.head().caller()),
+                            Head::new_with_version(request.head().caller()),
                             trtcp::Status::new(trtcp::StatusType::EventNotFound),
                             "".as_bytes(),
                         );
@@ -30,14 +29,14 @@ impl ReqHandler for InvokeHandler {
                 };
                 
                 let callback_request = Request::new(
-                    new_head(caller_name),
+                    Head::new_with_version(caller_name),
                     Action::new(ActionType::Callback, request.action().module(), request.action().id()),
                     *request.body()
                 );
 
                 let call_bytes: Vec<u8> = callback_request.into();
                 
-                let guard = CLIENTS.read().await;
+                let guard = CLIENT_WRITERS.read().await;
                 for listener in listeners.iter() {
                     let client = if let Some(c) = guard.get(listener) {
                         c
@@ -51,7 +50,7 @@ impl ReqHandler for InvokeHandler {
                     }
                 }
                 
-                ok_response(caller_name)
+                Response::new_ok(caller_name)
             }
         })
     }

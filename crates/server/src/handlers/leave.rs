@@ -1,8 +1,7 @@
 use crate::handlers::{ReqHandler, EVENTS};
-use server::new_head;
 use std::future::Future;
 use std::pin::Pin;
-use trtcp::{Request, Response};
+use trtcp::{Head, Request, Response};
 
 pub(super) struct LeaveHandler;
 
@@ -22,7 +21,7 @@ impl ReqHandler for LeaveHandler {
                     l
                 } else {
                     return Response::new(
-                        new_head(caller_name),
+                        Head::new_with_version(caller_name),
                         trtcp::Status::new(trtcp::StatusType::EventNotFound),
                         "".as_bytes(),
                     );
@@ -32,7 +31,7 @@ impl ReqHandler for LeaveHandler {
                     p
                 } else {
                     return Response::new(
-                        new_head(caller_name),
+                        Head::new_with_version(caller_name),
                         trtcp::Status::new(trtcp::StatusType::ListenerNotFound),
                         "".as_bytes(),
                     );
@@ -44,7 +43,7 @@ impl ReqHandler for LeaveHandler {
                 let listeners = if let Some(vec) = guard.get_mut(&event_name) {
                     vec
                 } else {
-                    return server::unexpected_error_response(
+                    return Response::new_unexpected_error(
                         caller_name,
                         "Event not found after it was found during a leave request",
                     );
@@ -53,7 +52,7 @@ impl ReqHandler for LeaveHandler {
                 listeners.swap_remove(item_position);
             }
 
-            server::ok_response(caller_name)
+            Response::new_ok(caller_name)
         })
     }
 }

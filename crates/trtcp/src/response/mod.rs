@@ -25,6 +25,22 @@ impl Response<'_> {
     pub fn body_as_str(&self) -> Result<&str, std::str::Utf8Error> {
         std::str::from_utf8(self.body)
     }
+    
+    pub fn new_ok(caller: &str) -> Response {
+        Response {
+            head: Head::new_with_version(caller),
+            status: Status::new(StatusType::OK),
+            body: "".as_bytes(),
+        }
+    }
+    
+    pub fn new_unexpected_error<'a>(caller: &'a str, error_msg: &'a str) -> Response<'a> {
+        Response {
+            head: Head::new_with_version(caller),
+            status: Status::new(StatusType::GenericError),
+            body: error_msg.as_bytes(),
+        }
+    }
 }
 
 impl<'r> TryFrom<&'r [u8]> for Response<'r> {

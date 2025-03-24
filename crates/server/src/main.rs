@@ -1,16 +1,14 @@
-extern crate core;
-
 mod handlers;
 
+use server::{Error, ReadHalfClient, WriteHalfClient};
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock};
 use tokio::net::TcpStream;
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 use tracing::error;
-use server::{Client, Error};
-use trtcp::{ActionType, Request, Response, Status, StatusType};
+use trtcp::{ActionType, Head, Request, Response, Status, StatusType};
 
-static CLIENTS: LazyLock<Arc<RwLock<HashMap<String, Client>>>> =
+static CLIENT_WRITERS: LazyLock<Arc<RwLock<HashMap<String, Arc<Mutex<WriteHalfClient>>>>>> =
     LazyLock::new(|| Arc::new(RwLock::new(HashMap::new())));
 
 #[tokio::main]
@@ -44,22 +42,21 @@ pub async fn start_server(port: u16) {
     }
 }
 
-async fn handle_client(socket: TcpStream) {
-    let client_name = match handle_first_connection(socket).await {
-        Ok(client) => {
-            let client = match client {
+async fn handle_client(mut socket: TcpStream) {
+    let socket = &mut socket;
+    let (mut reader, client_name) = match handle_first_connection(socket).await {
+        Ok(o) => {
+            let (reader, writer, caller_name) = match o {
                 Some(client) => client,
                 None => return,
             };
 
-            let client_name = client.name().to_string();
-
             {
-                let mut clients = CLIENTS.write().await;
-                clients.insert(client_name.to_string(), client);
+                let mut writers = CLIENT_WRITERS.write().await;
+                writers.insert(caller_name.to_string(), Arc::new(Mutex::new(writer)));
             }
 
-            client_name
+            (reader, caller_name)
         }
         Err(e) => {
             error!("{:?}", e);
@@ -70,78 +67,93 @@ async fn handle_client(socket: TcpStream) {
     let mut buffer = vec![];
 
     loop {
-        let request: Result<Request, Error> = {
-            let guard = CLIENTS.read().await;
-            let client = guard.get(&client_name).expect("Client not found");
-            client.read(&mut buffer, false).await
-        };
-        
+        let request: Result<Request, Error> = reader.read(&mut buffer, false).await;
+
         let request = match request {
             Ok(request) => request,
-            Err(e) => {
-                match e {
-                    Error::NoData => continue,
-                    _ => {
-                        let guard = CLIENTS.write().await;
-                        let client = guard.get(&client_name).expect("Client not found");
-                        let _ = client.shutdown().await;
-                        let client_name = client.name().to_string();
-                        drop(guard);
-                        CLIENTS.write().await.remove(&client_name);
-                        return;
+            Err(e) => match e {
+                Error::NoData => continue,
+                _ => {
+                    // Sending the shutdown signal to the client
+                    {
+                        let _ = CLIENT_WRITERS
+                            .write()
+                            .await
+                            .get(&client_name)
+                            .expect("Client not found")
+                            .lock()
+                            .await
+                            .shutdown()
+                            .await;
                     }
+
+                    // Removing the client from the list
+                    {
+                        CLIENT_WRITERS.write().await.remove(&client_name);
+                    }
+                    return;
                 }
-            }
+            },
         };
-        
+
         // Creating a response
         let response = handlers::handle_request(&request).await;
 
         {
-            let guard = CLIENTS.read().await;
-            let client = guard.get(&client_name).expect("Client not found");
+            let guard = CLIENT_WRITERS.read().await;
+            let mut writer = guard
+                .get(&client_name)
+                .expect("Client not found")
+                .lock()
+                .await;
 
-            if client.write(response).await.is_err() {
+            if writer.write(response).await.is_err() {
                 error!("Error writing response to client {}", client_name);
-                let _ = client.shutdown().await;
-                CLIENTS.write().await.remove(&client_name);
+                let _ = writer.shutdown().await;
+                drop(writer);
+                drop(guard);
+                CLIENT_WRITERS.write().await.remove(&client_name);
                 break;
             }
         }
     }
 }
 
-async fn handle_first_connection(socket: TcpStream) -> Result<Option<Client>, Error> {
-    let mut client = Client::from(socket);
+async fn handle_first_connection(
+    socket: &mut TcpStream,
+) -> Result<Option<(ReadHalfClient, WriteHalfClient, String)>, Error> {
+    let (mut reader, mut writer) = server::split(socket, "tmp").await;
 
     let mut buff = Vec::new();
-    let request: Request = client.read_and_wait(&mut buff).await?;
+    let request: Request = reader.read_and_wait(&mut buff).await?;
 
     let client_name = request.head().caller();
 
-    match request.action().r#type() { 
+    match request.action().r#type() {
         ActionType::Connect => {
-            let response = server::ok_response(client_name);
+            let response = Response::new_ok(client_name);
 
-            client.set_name(client_name.to_string());
-            client.write(response).await?;
-            Ok(Some(client))
+            writer.set_name(client_name.to_string());
+            reader.set_name(client_name.to_string());
+
+            writer.write(response).await?;
+            Ok(Some((reader, writer, client_name.to_string())))
         }
         ActionType::Invoke => {
             let response = handlers::handle_request(&request).await;
-            client.write(response).await?;
-            client.shutdown().await?;
+            writer.write(response).await?;
+            writer.shutdown().await?;
             Ok(None)
         }
         _ => {
             let response = Response::new(
-                server::new_head(client_name),
+                Head::new_with_version(client_name),
                 Status::new(StatusType::NeedConnection),
                 "".as_ref(),
             );
 
-            client.write(response).await?;
-            client.shutdown().await?;
+            writer.write(response).await?;
+            writer.shutdown().await?;
             Ok(None)
         }
     }
@@ -177,17 +189,20 @@ mod test {
             client.write(request).await.expect("Could not write");
 
             let mut buf = vec![0u8; 1024];
-            let response: Response = client.read_and_wait(&mut buf).await.expect("Could not read");
-            
+            let response: Response = client
+                .read_and_wait(&mut buf)
+                .await
+                .expect("Could not read");
+
             assert_eq!(response.head().caller(), client_name);
             assert_eq!(*response.status().r#type(), StatusType::OK);
-            assert!(CLIENTS.read().await.contains_key(&client_name));
+            assert!(CLIENT_WRITERS.read().await.contains_key(&client_name));
         }
 
         tokio::time::sleep(Duration::from_millis(100)).await;
-        
-        assert_eq!(CLIENTS.read().await.len(), 0);
-        
+
+        assert_eq!(CLIENT_WRITERS.read().await.len(), 0);
+
         server.abort();
     }
 }

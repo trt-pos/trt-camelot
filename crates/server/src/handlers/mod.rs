@@ -3,7 +3,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, LazyLock};
 use tokio::sync::RwLock;
-use trtcp::{Response, StatusType};
+use trtcp::{Response, StatusType, Version};
 
 mod invoke;
 mod create;
@@ -38,8 +38,8 @@ impl From<&trtcp::ActionType> for Box<dyn ReqHandler> {
 }
 
 pub async fn handle_request<'a>(request: &'a trtcp::Request<'_>) -> Response<'a> {
-    let version = &request.head().version();
-    if *version.major() != 1 || *version.patch() != 0 {
+    let version = request.head().version();
+    if *version.major() != *Version::actual().major() {
         panic!(
             "Unsupported version: {}.{}",
             version.major(),
