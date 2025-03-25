@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/server", "crates/trtcp"]
+members = ["crates/camelot", "crates/trtcp"]
 
 [workspace.dependencies]
 tokio = { version = "1.43.0", features = ["full", "default"] }

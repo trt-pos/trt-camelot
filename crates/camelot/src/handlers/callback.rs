@@ -11,11 +11,11 @@ impl ReqHandler for CallbackHandler {
         request: &'a Request<'_>,
     ) -> Pin<Box<dyn Future<Output = Response<'a>> + Send + 'a>> {
         Box::pin(async move {
-            return Response::new(
+            Response::new(
                 Head::new_with_version(request.head().caller()),
                 trtcp::Status::new(trtcp::StatusType::InvalidRequest),
                 "Server doesn't handle callbacks. Clients recive them when someone does an invoke request".as_bytes(),
-            );
+            )
         })
     }
 }

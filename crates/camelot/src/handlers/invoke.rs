@@ -41,6 +41,7 @@ impl ReqHandler for InvokeHandler {
                     let mut writer = if let Some(c) = guard.get(listener) {
                         c.lock().await
                     } else {
+                        // TODO: Remove the client name from the listeners 
                         warn!("Client {} not found but is registered as a listener", listener);
                         continue
                     };

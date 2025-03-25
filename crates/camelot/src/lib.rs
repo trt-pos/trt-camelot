@@ -1,6 +1,5 @@
 mod error;
 
-use std::io::ErrorKind;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpStream;
@@ -93,13 +92,7 @@ async fn write_stream(writer: &mut OwnedWriteHalf, bytes: &[u8]) -> Result<(), E
 async fn read_stream(reader: &mut OwnedReadHalf, buf: &mut Vec<u8>) -> Result<(), Error> {
     loop {
         let mut tmp_buf = [0; 1024];
-        let size = reader.read(&mut tmp_buf).await.map_err(|e| {
-            if e.kind() == ErrorKind::WouldBlock {
-                Error::NoData
-            } else {
-                Error::ReadingError
-            }
-        })?;
+        let size = reader.read(&mut tmp_buf).await?;
 
         if size == 0 {
             return Err(Error::ConexionClosed);
