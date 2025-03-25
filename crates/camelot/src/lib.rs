@@ -30,6 +30,10 @@ impl WriteHalfClient {
         Ok(())
     }
 
+    pub async fn is_open(&self) -> bool {
+        self.stream.writable().await.is_ok()
+    }
+    
     pub fn name(&self) -> &str {
         &self.name
     }

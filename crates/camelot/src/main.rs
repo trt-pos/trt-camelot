@@ -60,7 +60,7 @@ async fn handle_client(socket: TcpStream) {
 
             {
                 let writers = CLIENT_WRITERS.read().await;
-                if writers.contains_key(&caller_name) {
+                if writers.contains_key(&caller_name) && writers.get(&caller_name).unwrap().lock().await.is_open().await {
                     info!(
                         "disconnecting client that used a name that is already in use ({})",
                         caller_name
@@ -85,7 +85,11 @@ async fn handle_client(socket: TcpStream) {
             (reader, caller_name)
         }
         Err(e) => {
-            error!("error handling first client connection {:?}", e);
+            if let Error::ConexionClosed = e { 
+                info!("connection closed with {:?}", client_addr)
+            } else { 
+                error!("error handling first client connection ({:?}) {:?}", client_addr, e)
+            }
             return;
         }
     };
@@ -120,7 +124,7 @@ async fn handle_client(socket: TcpStream) {
                     CLIENT_WRITERS.write().await.remove(&client_name);
                 }
                 info!(
-                    "due to an error while reading the client ({:?}) request, this has beed disconnected and removed",
+                    "due to an error while reading the client ({:?}) request, this has been disconnected and removed",
                     client_addr
                 );
                 return;
@@ -156,6 +160,8 @@ async fn handle_first_connection(
     let client_addr = socket.peer_addr();
     let (mut reader, mut writer) = camelot::split(socket, "tmp").await;
 
+    info!("handling first connection of {:?}", client_addr);
+    
     let mut buff = Vec::new();
     let request: Request = reader.read(&mut buff).await?;
 
