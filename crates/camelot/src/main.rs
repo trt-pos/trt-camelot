@@ -3,7 +3,7 @@ mod handlers;
 use camelot::{Error, ReadHalfClient, WriteHalfClient};
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock};
-use tokio::net::TcpStream;
+use tokio::net::{TcpStream};
 use tokio::sync::{Mutex, RwLock};
 use tracing::{error, info};
 use trtcp::{ActionType, Head, Request, Response, Status, StatusType};
@@ -26,9 +26,9 @@ async fn main() {
 }
 
 pub async fn start_server(port: u16) {
-    let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", port))
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port))
         .await
-        .unwrap_or_else(|_| panic!("Could not bind to 127.0.0.1:{}", port));
+        .unwrap_or_else(|_| panic!("Could not bind to port {}", port));
 
     info!("camelot initialized on port {}", port);
 
