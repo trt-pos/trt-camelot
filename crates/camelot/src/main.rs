@@ -79,6 +79,10 @@ async fn handle_client(socket: TcpStream) {
 
             {
                 let mut writers = CLIENT_WRITERS.write().await;
+
+                let response = Response::new_ok(&caller_name);
+                let _ = writer.write(response).await;
+                
                 writers.insert(caller_name.to_string(), Arc::new(Mutex::new(writer)));
             }
 
@@ -170,12 +174,10 @@ async fn handle_first_connection(
     match request.action().r#type() {
         ActionType::Connect => {
             info!("persistence connection request sended by {:?}", client_addr);
-            let response = Response::new_ok(client_name);
 
             writer.set_name(client_name.to_string());
             reader.set_name(client_name.to_string());
-
-            writer.write(response).await?;
+            
             Ok(Some((reader, writer, client_name.to_string())))
         }
         ActionType::Invoke => {
