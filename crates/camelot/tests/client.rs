@@ -1,5 +1,5 @@
-use server::{ReadHalfClient, WriteHalfClient};
 use tokio::net::TcpStream;
+use camelot::{ReadHalfClient, WriteHalfClient};
 
 pub struct TestClient {
     reader: ReadHalfClient,
@@ -9,7 +9,7 @@ pub struct TestClient {
 
 impl TestClient {
     pub async fn new(name: &str) -> Self {
-        let (reader, writer) = server::split(
+        let (reader, writer) = camelot::split(
             TcpStream::connect("localhost:1237")
                 .await
                 .expect("Could not connect"),
