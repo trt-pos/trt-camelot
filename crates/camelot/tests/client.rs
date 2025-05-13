@@ -1,5 +1,5 @@
-use tokio::net::TcpStream;
 use camelot::{ReadHalfClient, WriteHalfClient};
+use tokio::net::TcpStream;
 
 pub struct TestClient {
     reader: ReadHalfClient,

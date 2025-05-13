@@ -1,7 +1,7 @@
+use crate::handlers::{ReqHandler, EVENTS};
 use std::future::Future;
 use std::pin::Pin;
 use trtcp::{Head, Request, Response};
-use crate::handlers::{ReqHandler, EVENTS};
 
 pub(super) struct CreateHandler;
 

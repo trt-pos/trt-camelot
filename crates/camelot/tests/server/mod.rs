@@ -1,4 +1,4 @@
-use std::sync::{LazyLock};
+use std::sync::LazyLock;
 use std::time::Duration;
 use tokio::process::Child;
 use tokio::process::Command;

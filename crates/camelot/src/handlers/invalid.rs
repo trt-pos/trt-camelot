@@ -1,7 +1,7 @@
+use crate::handlers::ReqHandler;
 use std::future::Future;
 use std::pin::Pin;
 use trtcp::{Request, Response, StatusType};
-use crate::handlers::ReqHandler;
 
 pub(super) struct InvalidHandler {
     status_type: StatusType,

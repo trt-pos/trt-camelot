@@ -1,9 +1,9 @@
+use crate::handlers::{ReqHandler, EVENTS};
+use crate::CLIENT_WRITERS;
 use std::future::Future;
 use std::pin::Pin;
 use tracing::warn;
 use trtcp::{Action, ActionType, Head, Request, Response};
-use crate::handlers::{ReqHandler, EVENTS};
-use crate::CLIENT_WRITERS;
 
 pub(super) struct InvokeHandler;
 
